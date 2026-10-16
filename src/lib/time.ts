@@ -41,6 +41,14 @@ export function showTime(value: string): string {
   return value.replace(/^0(\d)/, "$1");
 }
 
+export function formatWait(delta: number): string {
+  if (delta <= 0) return "sada";
+  if (delta < 60) return `za ${delta} min`;
+  const hours = Math.floor(delta / 60);
+  const minutes = delta % 60;
+  return minutes ? `za ${hours} h ${minutes} min` : `za ${hours} h`;
+}
+
 export function formatWhen(iso: string): string {
   return new Intl.DateTimeFormat("hr-HR", {
     timeZone: "Europe/Zagreb",

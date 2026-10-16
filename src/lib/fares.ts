@@ -107,25 +107,46 @@ export function quoteFare(input: {
   return { zone, overMax, base, percent, price, note, category };
 }
 
-export const SALES_POINTS = [
+export type SalesPoint = {
+  id: string;
+  place: string;
+  address: string;
+  hours: string;
+  lat: number;
+  lng: number;
+};
+
+export const SALES_POINTS: SalesPoint[] = [
   {
+    id: "at-karlovac",
     place: "Karlovac · Autotransport",
     address: "Prilaz Većeslava Holjevca 2",
-    hours: "Radnim danom 5:30–15:30, prva subota 7:00–12:00",
+    hours: "Radnim danom 5:30–15:30. Prva subota u mjesecu 7:00–12:00.",
+    lat: 45.488406,
+    lng: 15.550189,
   },
   {
+    id: "arriva-karlovac",
     place: "Karlovac · Arriva",
     address: "Prilaz Većeslava Holjevca 2",
-    hours: "Radnim danom 5:30–21:00, kartomat 0–24",
+    hours: "Radnim danom 5:30–21:00. Kartomat za jednokratne i dnevne karte radi 0–24.",
+    lat: 45.48876,
+    lng: 15.55062,
   },
   {
+    id: "ogulin",
     place: "Ogulin",
     address: "Trg dr. Franje Tuđmana 2",
-    hours: "Radnim danom 7:00–15:00, kartomat 0–24",
+    hours: "Radnim danom 7:00–15:00. Kartomat radi 0–24.",
+    lat: 45.265846,
+    lng: 15.230807,
   },
   {
+    id: "slunj",
     place: "Slunj",
     address: "Trg dr. Franje Tuđmana 1a",
-    hours: "Radnim danom 6:00–14:00",
+    hours: "Radnim danom 6:00–14:00.",
+    lat: 45.114747,
+    lng: 15.585741,
   },
 ];

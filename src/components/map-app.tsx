@@ -11,8 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useKazu } from "@/components/providers";
-import { departuresForStop, GROUP_LABEL, linesAtStop, liveBuses } from "@/lib/schedule";
-import { DAY_LABEL, showTime, zagrebParts } from "@/lib/time";
+import { SALES_POINTS, type SalesPoint } from "@/lib/fares";
+import { departuresForStop, GROUP_LABEL, linesAtStop, liveBuses, stopOnShape } from "@/lib/schedule";
+import { DAY_LABEL, formatWait, showTime, zagrebParts } from "@/lib/time";
 import type { Line, Stop } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
 
@@ -24,6 +25,15 @@ function busIcon(code: string, color: string) {
     html: `<span style="background:${color}">${code}</span>`,
     iconSize: [44, 22],
     iconAnchor: [22, 11],
+  });
+}
+
+function officeIcon() {
+  return L.divIcon({
+    className: "office-pin",
+    html: "<span>Blagajna</span>",
+    iconSize: [78, 22],
+    iconAnchor: [39, 11],
   });
 }
 
@@ -56,6 +66,7 @@ export function MapApp() {
   const [showBuses, setShowBuses] = useState(true);
   const lineId = params.get("linija");
   const stopId = params.get("stop");
+  const officeId = params.get("blagajna");
 
   useEffect(() => {
     const timer = setInterval(() => setNow(zagrebParts()), 15000);
@@ -66,6 +77,7 @@ export function MapApp() {
   const lines = network?.lines ?? [];
   const selectedLine = lines.find((line) => line.id === lineId) ?? null;
   const selectedStop = stops.find((stop) => stop.id === stopId) ?? null;
+  const selectedOffice = SALES_POINTS.find((point) => point.id === officeId) ?? null;
 
   const departures = useMemo(
     () => (selectedStop ? departuresForStop(lines, stops, selectedStop.id, now.day) : []),
@@ -83,16 +95,31 @@ export function MapApp() {
   function setQueryParams(next: { stop?: string | null; linija?: string | null }) {
     const search = new URLSearchParams(params.toString());
     if (next.stop === null) search.delete("stop");
-    else if (next.stop) search.set("stop", next.stop);
+    else if (next.stop) {
+      search.set("stop", next.stop);
+      search.delete("blagajna");
+    }
     if (next.linija === null) search.delete("linija");
     else if (next.linija) search.set("linija", next.linija);
     const text = search.toString();
-    router.replace(text ? `/?${text}` : "/", { scroll: false });
+    router.replace(text ? `/karta?${text}` : "/karta", { scroll: false });
+  }
+
+  function openOffice(id: string | null) {
+    const search = new URLSearchParams(params.toString());
+    if (id) {
+      search.set("blagajna", id);
+      search.delete("stop");
+    } else {
+      search.delete("blagajna");
+    }
+    const text = search.toString();
+    router.replace(text ? `/karta?${text}` : "/karta", { scroll: false });
   }
 
   const visibleLines = selectedLine ? [selectedLine] : lines;
   const linePoints: [number, number][] = selectedLine
-    ? selectedLine.directions.flatMap((direction) => direction.geometry)
+    ? selectedLine.directions.flatMap((direction) => (direction.shape?.length ? direction.shape : direction.geometry))
     : [];
 
   const markers: Point[] = useMemo(() => {
@@ -102,7 +129,7 @@ export function MapApp() {
       for (const direction of selectedLine.directions) {
         direction.stops.forEach((stop, index) => {
           if (seen.has(stop.stopId)) return;
-          const geometry = direction.geometry[index];
+          const geometry = stopOnShape(direction, index);
           const named = stops.find((item) => item.id === stop.stopId);
           if (!geometry || !named) return;
           seen.add(stop.stopId);
@@ -161,8 +188,8 @@ export function MapApp() {
             line.directions.map((direction) => (
               <Polyline
                 key={direction.id}
-                positions={direction.geometry}
-                pathOptions={{ color: line.color, weight: selectedLine ? 5 : 3, opacity: selectedLine ? 0.9 : 0.72 }}
+                positions={direction.shape?.length ? direction.shape : direction.geometry}
+                pathOptions={{ color: line.color, weight: selectedLine ? 5 : 3, opacity: selectedLine ? 0.9 : 0.55 }}
               />
             )),
           )}
@@ -182,6 +209,17 @@ export function MapApp() {
               <Tooltip>{marker.name}</Tooltip>
             </CircleMarker>
           ))}
+          {SALES_POINTS.map((point) => (
+            <Marker
+              key={point.id}
+              position={[point.lat, point.lng]}
+              icon={officeIcon()}
+              zIndexOffset={400}
+              eventHandlers={{ click: () => openOffice(point.id) }}
+            >
+              <Tooltip>{point.place}</Tooltip>
+            </Marker>
+          ))}
           {buses.map((bus) => (
             <Marker key={bus.id} position={[bus.lat, bus.lng]} icon={busIcon(bus.code, bus.color)}>
               <Tooltip>
@@ -191,12 +229,12 @@ export function MapApp() {
               </Tooltip>
             </Marker>
           ))}
-          <FlyTo lat={selectedStop?.lat ?? null} lng={selectedStop?.lng ?? null} />
+          <FlyTo lat={selectedStop?.lat ?? selectedOffice?.lat ?? null} lng={selectedStop?.lng ?? selectedOffice?.lng ?? null} />
           {selectedLine && !selectedStop && <FitLine lineId={selectedLine.id} points={linePoints} />}
         </MapContainer>
       </div>
 
-      <aside className="absolute inset-x-0 bottom-0 z-20 flex max-h-[68%] flex-col rounded-t-3xl bg-card shadow-[0_-12px_40px_rgba(30,40,30,0.18)] ring-1 ring-foreground/10 lg:inset-y-0 lg:left-0 lg:max-h-none lg:w-[390px] lg:rounded-none">
+      <aside className="absolute inset-x-0 bottom-0 z-20 flex max-h-[52%] flex-col rounded-t-3xl bg-card pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_40px_rgba(30,40,30,0.18)] ring-1 ring-foreground/10 sm:max-h-[58%] lg:inset-y-0 lg:left-0 lg:max-h-none lg:w-[390px] lg:rounded-none lg:pb-0">
         <div className="border-b px-4 py-3">
           <div className="relative">
             <Search className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
@@ -254,6 +292,7 @@ export function MapApp() {
               stop={selectedStop}
               serving={serving}
               upcoming={upcoming.slice(0, 8)}
+              nowMinutes={now.minutes}
               passedCount={passed.length}
               favorite={favoriteStopIds.includes(selectedStop.id)}
               favoriteLines={favoriteLineIds}
@@ -262,6 +301,8 @@ export function MapApp() {
               onHeart={() => onHeart("stop", selectedStop.id)}
               onHeartLine={(id) => onHeart("line", id)}
             />
+          ) : selectedOffice ? (
+            <OfficeDetail office={selectedOffice} onClose={() => openOffice(null)} />
           ) : (
             <LineList
               lines={lines}
@@ -269,11 +310,12 @@ export function MapApp() {
               favorites={favoriteLineIds}
               onPick={(id) => setQueryParams({ linija: id === lineId ? null : id, stop: null })}
               onHeart={(id) => onHeart("line", id)}
+              onOffice={openOffice}
             />
           )}
         </div>
         <p className="border-t px-4 py-2 text-[11px] leading-snug text-muted-foreground">
-          Položaj autobusa je procjena iz voznog reda, ne GPS. Stajališta su približno smještena prema nazivu i kilometraži.
+          Rute prate ceste. Stajališta u istom naselju znaju dijeliti jednu točku dok se ne unesu točne koordinate stupa. Autobus je procjena iz voznog reda, ne GPS.
         </p>
       </aside>
     </div>
@@ -286,12 +328,14 @@ function LineList({
   favorites,
   onPick,
   onHeart,
+  onOffice,
 }: {
   lines: Line[];
   activeId: string | null;
   favorites: string[];
   onPick: (id: string) => void;
   onHeart: (id: string) => void;
+  onOffice: (id: string) => void;
 }) {
   const groups = ["A", "B", "C", "D", "E"];
   return (
@@ -330,6 +374,38 @@ function LineList({
           </section>
         );
       })}
+      <section>
+        <h2 className="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Blagajne</h2>
+        <ul className="space-y-1">
+          {SALES_POINTS.map((point) => (
+            <li key={point.id}>
+              <button type="button" className="w-full rounded-xl px-2 py-2 text-left hover:bg-muted" onClick={() => onOffice(point.id)}>
+                <span className="block text-sm">{point.place}</span>
+                <span className="block text-xs text-muted-foreground">{point.hours}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+function OfficeDetail({ office, onClose }: { office: SalesPoint; onClose: () => void }) {
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-xs text-muted-foreground">Blagajna</p>
+          <h1 className="font-display text-2xl leading-tight">{office.place}</h1>
+        </div>
+        <button type="button" onClick={onClose} className="rounded-full bg-muted px-2 py-1 text-xs">
+          Zatvori
+        </button>
+      </div>
+      <p className="mt-3 text-sm">{office.address}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{office.hours}</p>
+      <p className="mt-3 text-xs text-muted-foreground">Radno vrijeme je sa stranice cijena na kazup.hr.</p>
     </div>
   );
 }
@@ -338,6 +414,7 @@ function StopDetail({
   stop,
   serving,
   upcoming,
+  nowMinutes,
   passedCount,
   favorite,
   favoriteLines,
@@ -349,6 +426,7 @@ function StopDetail({
   stop: Stop;
   serving: Line[];
   upcoming: ReturnType<typeof departuresForStop>;
+  nowMinutes: number;
   passedCount: number;
   favorite: boolean;
   favoriteLines: string[];
@@ -396,7 +474,10 @@ function StopDetail({
         <ul className="mt-2 divide-y">
           {upcoming.map((item) => (
             <li key={`${item.tripId}-${item.time}-${item.directionId}`} className="flex items-center gap-3 py-2">
-              <span className="w-12 font-display text-lg">{showTime(item.time)}</span>
+              <span className="w-14 shrink-0">
+                <span className="block font-display text-lg leading-none">{showTime(item.time)}</span>
+                <span className="text-[11px] text-primary">{formatWait(item.minutes - nowMinutes)}</span>
+              </span>
               <span className="grid h-6 min-w-9 place-items-center rounded-full px-1.5 text-[11px] font-semibold text-white" style={{ background: item.color }}>
                 {item.code}
               </span>
@@ -406,12 +487,12 @@ function StopDetail({
         </ul>
       )}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button size="lg" render={<Link href={`/karte?od=${stop.id}`} />}>Karta odavde</Button>
-        {serving[0] && (
-          <Button size="lg" variant="outline" render={<Link href={`/linije/${serving[0].id}`} />}>
-            Cijeli red
+        <Button size="lg" nativeButton={false} render={<Link href={`/karte?od=${stop.id}`} />}>Karta odavde</Button>
+        {serving.map((line) => (
+          <Button key={line.id} size="lg" variant="outline" nativeButton={false} render={<Link href={`/linije/${line.id}?stop=${stop.id}`} />}>
+            Red {line.code}
           </Button>
-        )}
+        ))}
       </div>
     </div>
   );

@@ -12,6 +12,19 @@ export type Store = Network & {
 const dataDir = path.join(process.cwd(), "data");
 const networkPath = path.join(dataDir, "network.json");
 const storePath = path.join(dataDir, "store.json");
+const roadsPath = path.join(dataDir, "roads.json");
+
+type RoadShape = { points: [number, number][]; anchors: number[] };
+let roadsCache: { mtime: number; roads: Record<string, RoadShape> } | null = null;
+
+function readRoads(): Record<string, RoadShape> {
+  if (!fs.existsSync(roadsPath)) return {};
+  const mtime = fs.statSync(roadsPath).mtimeMs;
+  if (roadsCache && roadsCache.mtime === mtime) return roadsCache.roads;
+  const roads = JSON.parse(fs.readFileSync(roadsPath, "utf8")) as Record<string, RoadShape>;
+  roadsCache = { mtime, roads };
+  return roads;
+}
 
 const globalStore = globalThis as typeof globalThis & { __kazuQueue?: Promise<unknown> };
 
@@ -107,13 +120,21 @@ export function updateStore<T>(fn: (store: Store) => T, bump = true): Promise<T>
 }
 
 export function networkView(store: Store): Network {
+  const roads = readRoads();
   return {
     version: store.version,
     updatedAt: store.updatedAt,
     note: store.note,
     source: store.source,
     stops: store.stops,
-    lines: store.lines,
+    lines: store.lines.map((line) => ({
+      ...line,
+      directions: line.directions.map((direction) => {
+        const road = roads[direction.id];
+        if (!road?.points?.length || road.anchors?.length !== direction.stops.length) return direction;
+        return { ...direction, shape: road.points, shapeAnchors: road.anchors };
+      }),
+    })),
     announcements: store.announcements,
   };
 }

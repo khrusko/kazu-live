@@ -9,7 +9,8 @@ import { useKazu } from "@/components/providers";
 import { formatWhen } from "@/lib/time";
 
 const LINKS = [
-  { href: "/", label: "Karta" },
+  { href: "/", label: "Vožnja" },
+  { href: "/karta", label: "Karta" },
   { href: "/linije", label: "Linije" },
   { href: "/obavijesti", label: "Obavijesti" },
   { href: "/karte", label: "Karte" },

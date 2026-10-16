@@ -243,10 +243,11 @@ function TicketDesk() {
           <h2 className="font-display text-xl">Blagajne</h2>
           <ul className="mt-3 space-y-3 text-sm">
             {SALES_POINTS.map((point) => (
-              <li key={point.place}>
+              <li key={point.id}>
                 <p className="font-medium">{point.place}</p>
                 <p className="text-muted-foreground">{point.address}</p>
                 <p className="text-xs text-muted-foreground">{point.hours}</p>
+                <Link href={`/karta?blagajna=${point.id}`} className="text-xs text-primary">Na karti</Link>
               </li>
             ))}
           </ul>

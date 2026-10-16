@@ -145,6 +145,27 @@
   border: none;
 }
 
+.leaflet-div-icon.office-pin {
+  background: transparent;
+  border: none;
+}
+
+.office-pin span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: oklch(0.62 0.14 55);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  border: 2px solid white;
+  box-shadow: 0 4px 12px rgba(40, 30, 10, 0.28);
+  white-space: nowrap;
+}
+
 .bus-pin span {
   display: flex;
   align-items: center;

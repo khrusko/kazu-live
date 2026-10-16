@@ -26,6 +26,10 @@ export type Direction = {
   stops: RouteStop[];
   trips: Trip[];
   geometry: [number, number][];
+  /** Road-following polyline, overlaid from data/roads.json. */
+  shape?: [number, number][];
+  /** Index of each stop inside `shape`. */
+  shapeAnchors?: number[];
 };
 
 export type Line = {
