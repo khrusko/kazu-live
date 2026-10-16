@@ -154,8 +154,8 @@ export function MapApp() {
       <div className="absolute inset-0 lg:left-[390px]">
         <MapContainer center={[45.4, 15.55]} zoom={10} className="h-full w-full" scrollWheelZoom>
           <TileLayer
-            attribution='&copy; OpenStreetMap &copy; CARTO'
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {visibleLines.map((line) =>
             line.directions.map((direction) => (
