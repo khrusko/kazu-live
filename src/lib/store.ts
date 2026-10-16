@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { cookies } from "next/headers";
 import { hashPassword, readSession, SESSION_COOKIE } from "./auth";
@@ -11,7 +12,6 @@ export type Store = Network & {
 
 const dataDir = path.join(process.cwd(), "data");
 const networkPath = path.join(dataDir, "network.json");
-const storePath = path.join(dataDir, "store.json");
 const roadsPath = path.join(dataDir, "roads.json");
 
 type RoadShape = { points: [number, number][]; anchors: number[] };
@@ -26,7 +26,40 @@ function readRoads(): Record<string, RoadShape> {
   return roads;
 }
 
-const globalStore = globalThis as typeof globalThis & { __kazuQueue?: Promise<unknown> };
+const globalStore = globalThis as typeof globalThis & {
+  __kazuQueue?: Promise<unknown>;
+  __kazuStorePath?: string;
+};
+
+function canWriteDir(dir: string): boolean {
+  const probe = path.join(dir, `.kazu-write-probe-${process.pid}`);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(probe, "1");
+    return true;
+  } catch {
+    return false;
+  } finally {
+    try {
+      fs.unlinkSync(probe);
+    } catch {
+      // Probe was never created, or the directory is read-only.
+    }
+  }
+}
+
+/** Local dev writes data/store.json. Netlify's /var/task is read-only, so fall back to the instance temp dir. */
+function storeFilePath(): string {
+  if (globalStore.__kazuStorePath) return globalStore.__kazuStorePath;
+  if (canWriteDir(dataDir)) {
+    globalStore.__kazuStorePath = path.join(dataDir, "store.json");
+    return globalStore.__kazuStorePath;
+  }
+  const runtimeDir = os.tmpdir();
+  fs.mkdirSync(runtimeDir, { recursive: true });
+  globalStore.__kazuStorePath = path.join(runtimeDir, "kazu-live-store.json");
+  return globalStore.__kazuStorePath;
+}
 
 function queue(): Promise<unknown> {
   if (!globalStore.__kazuQueue) globalStore.__kazuQueue = Promise.resolve();
@@ -85,18 +118,18 @@ function seed(): Store {
 }
 
 function ensure() {
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   if (!fs.existsSync(networkPath)) {
     throw new Error("Nema data/network.json. Vozni red još nije uvezen.");
   }
-  if (!fs.existsSync(storePath)) {
-    fs.writeFileSync(storePath, JSON.stringify(seed()));
+  const file = storeFilePath();
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, JSON.stringify(seed()));
   }
 }
 
 export function readStore(): Store {
   ensure();
-  return JSON.parse(fs.readFileSync(storePath, "utf8")) as Store;
+  return JSON.parse(fs.readFileSync(storeFilePath(), "utf8")) as Store;
 }
 
 export function updateStore<T>(fn: (store: Store) => T, bump = true): Promise<T> {
@@ -107,9 +140,10 @@ export function updateStore<T>(fn: (store: Store) => T, bump = true): Promise<T>
       store.version += 1;
       store.updatedAt = new Date().toISOString();
     }
-    const tmp = `${storePath}.tmp`;
+    const file = storeFilePath();
+    const tmp = `${file}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(store));
-    fs.renameSync(tmp, storePath);
+    fs.renameSync(tmp, file);
     return result;
   });
   globalStore.__kazuQueue = run.then(
