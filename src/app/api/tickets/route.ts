@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       };
       store.tickets.push(created);
       return created;
-    });
+    }, false);
     return NextResponse.json({ ticket });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Karta nije izdana.";

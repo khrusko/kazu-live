@@ -25,6 +25,6 @@ export async function PATCH(request: Request) {
       favoriteLineIds: found.favoriteLineIds,
       favoriteStopIds: found.favoriteStopIds,
     };
-  });
+  }, false);
   return NextResponse.json({ user });
 }

@@ -31,6 +31,6 @@ export async function POST(request: Request) {
       favoriteLineIds: found.favoriteLineIds,
       favoriteStopIds: found.favoriteStopIds,
     };
-  });
+  }, false);
   return NextResponse.json({ user });
 }

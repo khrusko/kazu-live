@@ -86,12 +86,14 @@ export function readStore(): Store {
   return JSON.parse(fs.readFileSync(storePath, "utf8")) as Store;
 }
 
-export function updateStore<T>(fn: (store: Store) => T): Promise<T> {
+export function updateStore<T>(fn: (store: Store) => T, bump = true): Promise<T> {
   const run = queue().then(() => {
     const store = readStore();
     const result = fn(store);
-    store.version += 1;
-    store.updatedAt = new Date().toISOString();
+    if (bump) {
+      store.version += 1;
+      store.updatedAt = new Date().toISOString();
+    }
     const tmp = `${storePath}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(store));
     fs.renameSync(tmp, storePath);

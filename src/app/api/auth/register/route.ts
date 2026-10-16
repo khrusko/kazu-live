@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       };
       store.users.push(created);
       return created;
-    });
+    }, false);
     const response = NextResponse.json({
       user: {
         id: user.id,
