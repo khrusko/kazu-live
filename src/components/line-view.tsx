@@ -72,7 +72,7 @@ export function LineView({ id }: { id: string }) {
           </div>
           <h1 className="font-display mt-2 text-3xl">{line.name}</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Polasci su iz službenog PDF-a. {direction.label}. Klik na stajalište otvara ga na karti.
+            {direction.label}. Podaci su preuzeti sa službenih rasporeda na kazup.hr.
           </p>
         </div>
         <div className="flex gap-2">

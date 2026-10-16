@@ -133,16 +133,17 @@
   font-family: var(--font-fraunces), Georgia, serif;
 }
 
-.font-pdark {
-  font-family: var(--font-pdark), var(--font-figtree), ui-sans-serif, sans-serif;
-  letter-spacing: 0.03em;
-}
-
 .leaflet-container {
   height: 100%;
   width: 100%;
   background: #e5efe8;
   font-family: inherit;
+}
+
+/* Leaflet paints tiles with plus-lighter, which drops dark orthophoto
+   JPEGs on a gray pane in headless Chrome. Draw them normally. */
+.leaflet-container img.leaflet-tile {
+  mix-blend-mode: normal !important;
 }
 
 .leaflet-div-icon.bus-pin {
@@ -155,8 +156,9 @@
   border: none;
 }
 
-.office-pin span {
-  display: flex;
+.office-pin span,
+.office-chip {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   height: 22px;
@@ -178,10 +180,10 @@
   min-width: 36px;
   height: 22px;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: 4px;
   color: white;
   font-size: 11px;
-  font-weight: 750;
+  font-weight: 700;
   letter-spacing: 0.01em;
   border: 2px solid white;
   box-shadow: 0 4px 12px rgba(20, 40, 30, 0.28);

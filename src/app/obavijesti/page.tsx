@@ -20,7 +20,7 @@ export default function NewsPage() {
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
       <h1 className="font-display text-4xl">Obavijesti</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Kad dispečer promijeni red vožnje, obavijest se pojavi odmah. Ako imate omiljene linije, zvonce u zaglavlju broji samo njih.
+        Obavijesti o izmjenama voznog reda. Zvonce broji obavijesti za omiljene linije.
       </p>
       {favoriteLineIds.length > 0 && (
         <section className="mt-6">

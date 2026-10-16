@@ -1,16 +1,43 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, ZoomControl, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Polyline, Tooltip, ZoomControl, useMap } from "react-leaflet";
+import L from "leaflet";
+import { Basemap, BasemapSwitch } from "@/components/basemap";
 import "leaflet/dist/leaflet.css";
 
-const OSM = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const SATELLITE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-
 export type RouteDraw = {
-  parts: { color: string; positions: [number, number][] }[];
+  parts: { color: string; code?: string; positions: [number, number][] }[];
   pins: { lat: number; lng: number; label: string }[];
 };
+
+function lineTag(code: string, color: string) {
+  return L.divIcon({
+    className: "bus-pin",
+    html: `<span style="background:${color}">${code}</span>`,
+    iconSize: [44, 22],
+    iconAnchor: [22, 11],
+  });
+}
+
+function lineTags(
+  routes: RouteDraw[],
+  active: number,
+  colorFor: (index: number, partColor: string) => string,
+) {
+  const tags = new Map<string, { code: string; color: string; position: [number, number]; active: boolean }>();
+  routes.forEach((route, index) => {
+    route.parts.forEach((part) => {
+      if (!part.code || part.positions.length === 0) return;
+      const position = part.positions[Math.floor(part.positions.length / 2)];
+      const previous = tags.get(part.code);
+      const chosen = index === active;
+      if (previous && !(chosen && !previous.active)) return;
+      tags.set(part.code, { code: part.code, color: colorFor(index, part.color), position, active: chosen });
+    });
+  });
+  return [...tags.values()];
+}
 
 function Fit({ positions, signature }: { positions: [number, number][]; signature: string }) {
   const map = useMap();
@@ -48,17 +75,8 @@ export function RouteMap({
 
   return (
     <div className="relative h-56 w-full sm:h-72">
-      <MapContainer center={center} zoom={11} className="h-full w-full" scrollWheelZoom={false} zoomControl={false}>
-        <TileLayer
-          key={satellite ? "sat" : "osm"}
-          attribution={
-            satellite
-              ? "Tiles &copy; Esri"
-              : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          }
-          url={satellite ? SATELLITE : OSM}
-          maxZoom={19}
-        />
+      <MapContainer center={center} zoom={11} className="h-full w-full" scrollWheelZoom={false} zoomControl={false} fadeAnimation={false}>
+        <Basemap satellite={satellite} />
         <ZoomControl position="bottomright" />
         {order.map((index) => {
           const route = routes[index];
@@ -81,6 +99,15 @@ export function RouteMap({
             ];
           });
         })}
+        {lineTags(routes, active, colorFor).map((tag) => (
+          <Marker
+            key={`tag-${tag.code}`}
+            position={tag.position}
+            icon={lineTag(tag.code, tag.color)}
+            interactive={false}
+            zIndexOffset={tag.active ? 500 : 200}
+          />
+        ))}
         {routes[active]?.pins.map((pin) => (
           <CircleMarker
             key={`${pin.label}-${pin.lat}`}
@@ -93,22 +120,7 @@ export function RouteMap({
         ))}
         <Fit positions={positions} signature={signature} />
       </MapContainer>
-      <div className="absolute top-2 right-2 z-[500] flex overflow-hidden rounded-full bg-white text-xs font-medium shadow ring-1 ring-black/10">
-        <button
-          type="button"
-          className={`px-3 py-1.5 ${satellite ? "text-foreground" : "bg-[oklch(0.34_0.06_168)] text-white"}`}
-          onClick={() => setSatellite(false)}
-        >
-          Karta
-        </button>
-        <button
-          type="button"
-          className={`px-3 py-1.5 ${satellite ? "bg-[oklch(0.34_0.06_168)] text-white" : "text-foreground"}`}
-          onClick={() => setSatellite(true)}
-        >
-          Satelit
-        </button>
-      </div>
+      <BasemapSwitch satellite={satellite} onChange={setSatellite} />
     </div>
   );
 }

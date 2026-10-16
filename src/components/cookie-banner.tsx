@@ -20,10 +20,10 @@ export function CookieBanner() {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[70] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="fixed inset-x-0 bottom-11 z-[70] p-3">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 rounded-2xl bg-card p-4 shadow-xl ring-1 ring-foreground/10 sm:flex-row sm:items-end">
         <p className="text-sm text-muted-foreground">
-          Nužni kolačići pamte prijavu i ovaj odabir. Lokacija ostaje u pregledniku i služi samo za najbliže stajalište. Karta se učitava s OpenStreetMapa, a satelitski prikaz s Esrija.{" "}
+          Nužni kolačići pamte prijavu i ovaj odabir. Lokacija ostaje u pregledniku i služi za najbliže stajalište. Karta se učitava s OpenStreetMapa, a satelitski prikaz s Geoportala DGU.{" "}
           <Link href="/privatnost" className="text-primary">
             Politika privatnosti
           </Link>

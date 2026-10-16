@@ -12,7 +12,7 @@ export default function PrivacyPage() {
       <p className="text-sm text-muted-foreground">Zadnje ažuriranje: 16. listopada 2026.</p>
       <h1 className="font-display mt-1 text-4xl">Politika privatnosti</h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        Ovo je neslužbena stranica tvrtke Sizel o autobusnim linijama Karlovačke županije. Nismo povezani s Karlovačkom županijom, Autotransportom, Arrivom ni drugim prijevoznikom. Vozni red je prepisan iz javno objavljenih rasporeda i može odstupati od prometa na cesti.
+        Autobusne linije Karlovačke županije. Neslužbena stranica, nepovezana s Karlovačkom županijom. Podaci su preuzeti sa službenih rasporeda na kazup.hr i mogu odstupati od prometa na cesti.
       </p>
 
       <h2 className="mt-8 text-xl font-medium">1. Voditelj obrade</h2>
@@ -36,7 +36,7 @@ export default function PrivacyPage() {
 
       <h2 className="mt-8 text-xl font-medium">4. Dijeljenje s trećim stranama</h2>
       <p className="mt-2 text-sm">
-        Pločice karte dolaze s OpenStreetMapa, a satelitski prikaz s Esri World Imagery. Ti poslužitelji vide IP adresu u trenutku učitavanja karte. Osim toga podatke s računa ne prosljeđujemo trećima u marketinške svrhe.
+        Pločice karte dolaze s OpenStreetMapa, a satelitski prikaz s Geoportala Državne geodetske uprave. Ti poslužitelji vide IP adresu u trenutku učitavanja karte. Podatke s računa ne prosljeđujemo trećima u marketinške svrhe.
       </p>
 
       <h2 className="mt-8 text-xl font-medium">5. Pohrana</h2>

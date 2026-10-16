@@ -128,7 +128,7 @@ export function TripHome() {
       <p className="text-xs tracking-wide text-muted-foreground uppercase">{now.dateLabel} · {now.clock} · {DAY_LABEL[now.day]}</p>
       <h1 className="font-display mt-1 text-4xl leading-none">Kamo putujete?</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Gost, bez prijave. Lokacija služi samo da se nađe najbliže stajalište i izračuna sljedeći autobus, uključujući presjedanje.
+        Lokacija služi samo u svrhu pronalaska najbližeg autobusnog stajališta.
       </p>
 
       <section className="mt-4 rounded-3xl bg-card p-4 ring-1 ring-foreground/10">
@@ -275,7 +275,7 @@ export function TripHome() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {serving.map((line) => (
                     <Link key={line.id} href={`/linije/${line.id}?stop=${origin.id}`} className="rounded-full bg-muted px-3 py-2 text-sm">
-                      Red {line.code}
+                      Linija {line.code}
                     </Link>
                   ))}
                 </div>
@@ -300,13 +300,13 @@ export function TripHome() {
 
 function drawPlan(plan: Itinerary | undefined, lines: Line[]) {
   if (!plan) return null;
-  const parts: { color: string; positions: [number, number][] }[] = [];
+    const parts: { color: string; code: string; positions: [number, number][] }[] = [];
   const pins: { lat: number; lng: number; label: string }[] = [];
   for (const leg of plan.legs) {
     const direction = lines.find((line) => line.id === leg.lineId)?.directions.find((item) => item.id === leg.directionId);
     if (!direction) continue;
     const positions = legShape(direction, leg.originIndex, leg.destinationIndex);
-    if (positions.length) parts.push({ color: leg.color, positions });
+    if (positions.length) parts.push({ color: leg.color, code: leg.code, positions });
     const origin = stopOnShape(direction, leg.originIndex);
     const destination = stopOnShape(direction, leg.destinationIndex);
     if (origin) pins.push({ lat: origin[0], lng: origin[1], label: leg.originName });
@@ -325,7 +325,7 @@ function PlanResult({
   items: Itinerary[];
   later: boolean;
   nowMinutes: number;
-  drawn: { parts: { color: string; positions: [number, number][] }[]; pins: { lat: number; lng: number; label: string }[] }[];
+  drawn: { parts: { color: string; code: string; positions: [number, number][] }[]; pins: { lat: number; lng: number; label: string }[] }[];
 }) {
   const [active, setActive] = useState(0);
   const plan = items[Math.min(active, Math.max(0, items.length - 1))];
@@ -345,7 +345,7 @@ function PlanResult({
         {later && (
           <p className="mb-2 text-sm text-muted-foreground">Danas više nema polaska. Prvi ovim rasporedom:</p>
         )}
-        <p className="text-xs text-muted-foreground">Odaberi rutu. Bez presjedanja je opcija A.</p>
+        <p className="text-xs text-muted-foreground">Sve rute od ovog trenutka. Odaberi jednu.</p>
         <ul className="mt-2 space-y-2">
           {items.map((item, index) => {
             const start = item.legs[0];
@@ -353,7 +353,7 @@ function PlanResult({
             const path = [start.originName, ...item.legs.map((leg) => leg.destinationName)].join(" → ");
             const chosen = item === plan;
             return (
-              <li key={`${start.directionId}-${start.depart}-${end.destinationStopId}`}>
+              <li key={`${item.legs.map((leg) => leg.lineId).join("-")}-${start.depart}`}>
                 <button
                   type="button"
                   onClick={() => setActive(index)}
@@ -363,7 +363,7 @@ function PlanResult({
                   <span className="text-muted-foreground"> · {item.transfers === 0 ? "bez presjedanja" : "presjedanje"}</span>
                   <span className="mt-0.5 block">{path}</span>
                   <span className="text-muted-foreground">
-                    {item.legs.map((leg) => leg.code).join(" → ")} · {showTime(start.depart)}
+                    {item.legs.map((leg) => `Linija ${leg.code}`).join(" → ")} · {showTime(start.depart)}
                     {!later && ` · ${formatWait(start.departMinutes - nowMinutes)}`}
                     {" · "}dolazak {showTime(end.arrive)}
                   </span>
@@ -402,7 +402,7 @@ function PlanResult({
                       <span className="tabular-nums">{showTime(leg.arrive)}</span>
                     </p>
                     <Link href={`/linije/${leg.lineId}?stop=${leg.originStopId}`} className="mt-1 inline-block text-primary">
-                      Vozni red {leg.code}
+                      Linija {leg.code}
                     </Link>
                   </div>
                 </div>

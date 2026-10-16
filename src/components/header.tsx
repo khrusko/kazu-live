@@ -64,7 +64,7 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[oklch(0.34_0.06_168)] text-white">
+    <header className="z-40 shrink-0 border-b border-white/10 bg-[oklch(0.34_0.06_168)] text-white">
       <div className="flex min-h-14 items-center gap-3 px-3 py-1.5 sm:px-5">
         <Link href="/" className="flex items-center gap-2 pr-2">
           <span className="grid size-8 place-items-center rounded-full bg-white/15">
@@ -72,11 +72,12 @@ export function Header() {
           </span>
           <span className="leading-tight">
             <span className="font-display block text-[15px] tracking-tight">Sizel</span>
-            <span className="block max-w-[16rem] text-[10px] leading-tight text-white/85">
+            <span className="block text-[10px] leading-tight text-white/85">
               Autobusne linije Karlovačke županije
             </span>
-            <span className="block max-w-[18rem] text-[10px] leading-tight text-white/60">
-              Neslužbeno · nismo povezani sa županijom
+            <span className="block text-[10px] leading-tight text-white/60">
+              Neslužbena stranica,{" "}
+              <span className="max-sm:block">nepovezana s Karlovačkom županijom</span>
             </span>
           </span>
         </Link>
@@ -144,9 +145,7 @@ export function Header() {
             onClick={(event) => event.stopPropagation()}
           >
             <p className="px-1 text-xs text-muted-foreground">
-              {favoriteLineIds.length
-                ? "Obavijesti za omiljene linije i opće obavijesti."
-                : "Označite liniju srcem da dobijete obavijest samo za nju. Ovdje su zasad sve opće."}
+              Obavijesti za omiljene linije.
             </p>
             <div className="mt-2 max-h-72 space-y-2 overflow-auto">
               {(notices.length ? notices : network?.announcements ?? []).slice(0, 4).map((item) => (

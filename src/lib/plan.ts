@@ -175,13 +175,11 @@ export function planJourneys(
   for (const from of index.get(originId) ?? []) {
     for (const to of index.get(destinationId) ?? []) {
       if (from.direction.id === to.direction.id) continue;
-      // This bus already reaches the destination. Keep that direct ride and don't also offer hopping off it.
-      if (from.direction.stops.slice(from.index + 1).some((stop) => stop.stopId === destinationId)) continue;
       const links = linksBetween(from, to, named);
       if (!links.length) continue;
       for (const trip of from.direction.trips) {
         if (trip.day !== day) continue;
-        let best: Itinerary | null = null;
+        const bestByPath = new Map<string, Itinerary>();
         for (const link of links) {
           if (to.direction.stops.slice(link.board + 1, to.index).some((stop) => stop.stopId === originId)) continue;
           const first = makeLeg(from.line, from.direction, trip, from.index, link.alight, named, 0, 0);
@@ -197,30 +195,33 @@ export function planJourneys(
             arriveMinutes: second.arriveMinutes,
             transfers: 1,
           };
+          const key = `${first.lineId}:${first.destinationStopId}>${second.lineId}:${second.originStopId}`;
+          const have = bestByPath.get(key);
           const walk = item.legs[1]?.walkMinutes ?? 0;
-          const bestWalk = best?.legs[1]?.walkMinutes ?? 0;
-          if (!best || item.arriveMinutes < best.arriveMinutes || (item.arriveMinutes === best.arriveMinutes && walk < bestWalk)) {
-            best = item;
+          const haveWalk = have?.legs[1]?.walkMinutes ?? 0;
+          if (!have || item.arriveMinutes < have.arriveMinutes || (item.arriveMinutes === have.arriveMinutes && walk < haveWalk)) {
+            bestByPath.set(key, item);
           }
         }
-        if (best) push(best);
+        for (const item of bestByPath.values()) push(item);
       }
     }
   }
 
-  // One next departure per path (line + direction), so a later direct is not hidden
-  // behind several earlier transfers of a different path.
+  // One card per line sequence (A9, or A9 then A7), keeping that route's first departure from now.
   const byRoute = new Map<string, Itinerary>();
   for (const item of found) {
-    const key = item.legs.map((leg) => `${leg.lineId}:${leg.directionId}`).join(">");
+    const key = item.legs.map((leg) => leg.lineId).join(">");
     const have = byRoute.get(key);
+    const walk = item.legs.reduce((sum, leg) => sum + leg.walkMinutes, 0);
+    const haveWalk = have ? have.legs.reduce((sum, leg) => sum + leg.walkMinutes, 0) : 0;
     const better =
       !have ||
       item.departMinutes < have.departMinutes ||
-      (item.departMinutes === have.departMinutes && item.arriveMinutes < have.arriveMinutes);
+      (item.departMinutes === have.departMinutes && (item.arriveMinutes < have.arriveMinutes || (item.arriveMinutes === have.arriveMinutes && walk < haveWalk)));
     if (better) byRoute.set(key, item);
   }
   return [...byRoute.values()]
     .sort((a, b) => a.transfers - b.transfers || a.departMinutes - b.departMinutes || a.arriveMinutes - b.arriveMinutes)
-    .slice(0, 4);
+    .slice(0, 12);
 }
