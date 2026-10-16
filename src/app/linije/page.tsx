@@ -10,7 +10,7 @@ export default function LinesPage() {
   if (error || !network) return <p className="p-8 text-sm">{error}</p>;
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
-      <p className="text-sm text-muted-foreground">KaŽu IDE BUS · 33 linije</p>
+      <p className="text-sm text-muted-foreground">Sizel · neslužbeni vozni red · 33 linije</p>
       <h1 className="font-display mt-1 text-4xl">Vozni red bez PDF-a</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         Svaka linija ima stajališta, kilometražu i polaske po danima. Podaci su prepisani sa službenih rasporeda na kazup.hr.

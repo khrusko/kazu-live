@@ -170,14 +170,14 @@ export function MapApp() {
   }
 
   if (loading) {
-    return <div className="grid h-[calc(100dvh-3.5rem)] place-items-center text-sm text-muted-foreground">Učitavam kartu i vozni red…</div>;
+    return <div className="grid h-[calc(100dvh-5.5rem)] place-items-center text-sm text-muted-foreground">Učitavam kartu i vozni red…</div>;
   }
   if (error || !network) {
-    return <div className="grid h-[calc(100dvh-3.5rem)] place-items-center px-6 text-center text-sm">{error || "Nema podataka."}</div>;
+    return <div className="grid h-[calc(100dvh-5.5rem)] place-items-center px-6 text-center text-sm">{error || "Nema podataka."}</div>;
   }
 
   return (
-    <div className="relative h-[calc(100dvh-3.5rem)] min-h-[560px]">
+    <div className="relative h-[calc(100dvh-5.5rem)] min-h-[560px]">
       <div className="absolute inset-0 lg:left-[390px]">
         <MapContainer center={[45.4, 15.55]} zoom={10} className="h-full w-full" scrollWheelZoom>
           <TileLayer
@@ -315,7 +315,7 @@ export function MapApp() {
           )}
         </div>
         <p className="border-t px-4 py-2 text-[11px] leading-snug text-muted-foreground">
-          Rute prate ceste. Stajališta u istom naselju znaju dijeliti jednu točku dok se ne unesu točne koordinate stupa. Autobus je procjena iz voznog reda, ne GPS.
+          Lokacije još nisu točno unesene, pa stajališta na karti mogu biti krivo označena.
         </p>
       </aside>
     </div>
@@ -487,7 +487,6 @@ function StopDetail({
         </ul>
       )}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button size="lg" nativeButton={false} render={<Link href={`/karte?od=${stop.id}`} />}>Karta odavde</Button>
         {serving.map((line) => (
           <Button key={line.id} size="lg" variant="outline" nativeButton={false} render={<Link href={`/linije/${line.id}?stop=${stop.id}`} />}>
             Red {line.code}

@@ -175,12 +175,15 @@ export function planJourneys(
   for (const from of index.get(originId) ?? []) {
     for (const to of index.get(destinationId) ?? []) {
       if (from.direction.id === to.direction.id) continue;
+      // This bus already reaches the destination. Keep that direct ride and don't also offer hopping off it.
+      if (from.direction.stops.slice(from.index + 1).some((stop) => stop.stopId === destinationId)) continue;
       const links = linksBetween(from, to, named);
       if (!links.length) continue;
       for (const trip of from.direction.trips) {
         if (trip.day !== day) continue;
         let best: Itinerary | null = null;
         for (const link of links) {
+          if (to.direction.stops.slice(link.board + 1, to.index).some((stop) => stop.stopId === originId)) continue;
           const first = makeLeg(from.line, from.direction, trip, from.index, link.alight, named, 0, 0);
           if (!first || first.departMinutes < fromMinutes) continue;
           const pad = link.walkMinutes > 0 ? link.walkMinutes : 1;
@@ -205,23 +208,19 @@ export function planJourneys(
     }
   }
 
-  const bestByDeparture = new Map<string, Itinerary>();
+  // One next departure per path (line + direction), so a later direct is not hidden
+  // behind several earlier transfers of a different path.
+  const byRoute = new Map<string, Itinerary>();
   for (const item of found) {
-    const key = `${item.departMinutes}|${item.legs[0].lineId}|${item.legs[0].originStopId}`;
-    const have = bestByDeparture.get(key);
+    const key = item.legs.map((leg) => `${leg.lineId}:${leg.directionId}`).join(">");
+    const have = byRoute.get(key);
     const better =
       !have ||
-      item.arriveMinutes < have.arriveMinutes ||
-      (item.arriveMinutes === have.arriveMinutes && item.transfers < have.transfers);
-    if (better) bestByDeparture.set(key, item);
+      item.departMinutes < have.departMinutes ||
+      (item.departMinutes === have.departMinutes && item.arriveMinutes < have.arriveMinutes);
+    if (better) byRoute.set(key, item);
   }
-  const unique = [...bestByDeparture.values()];
-  const directs = unique.filter((item) => item.transfers === 0);
-  return unique
-    .filter((item) => {
-      if (item.transfers === 0) return true;
-      return !directs.some((direct) => direct.departMinutes <= item.departMinutes && direct.arriveMinutes <= item.arriveMinutes);
-    })
-    .sort((a, b) => a.departMinutes - b.departMinutes || a.arriveMinutes - b.arriveMinutes || a.transfers - b.transfers)
+  return [...byRoute.values()]
+    .sort((a, b) => a.transfers - b.transfers || a.departMinutes - b.departMinutes || a.arriveMinutes - b.arriveMinutes)
     .slice(0, 4);
 }

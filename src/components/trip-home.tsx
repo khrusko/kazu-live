@@ -111,7 +111,10 @@ export function TripHome() {
     return { items: planJourneys(lines, stops, originId, destId, now.day, 0), later: true };
   }, [lines, stops, originId, destId, now.day, now.minutes]);
 
-  const drawn = useMemo(() => drawPlan(planned.items[0], lines), [planned.items, lines]);
+  const drawn = useMemo(
+    () => planned.items.map((item) => drawPlan(item, lines) ?? { parts: [], pins: [] }),
+    [planned.items, lines],
+  );
 
   if (loading) {
     return <p className="px-4 py-10 text-sm text-muted-foreground">Učitavam vozni red…</p>;
@@ -282,9 +285,9 @@ export function TripHome() {
 
           {destination && (
             <PlanResult
-              plan={planned.items[0]}
+              key={`${originId}|${destId}|${planned.later}|${planned.items.map((item) => item.legs.map((leg) => leg.directionId).join(">")).join(";")}`}
+              items={planned.items}
               later={planned.later}
-              alternatives={planned.items.slice(1)}
               nowMinutes={now.minutes}
               drawn={drawn}
             />
@@ -314,18 +317,18 @@ function drawPlan(plan: Itinerary | undefined, lines: Line[]) {
 }
 
 function PlanResult({
-  plan,
+  items,
   later,
-  alternatives,
   nowMinutes,
   drawn,
 }: {
-  plan: Itinerary | undefined;
+  items: Itinerary[];
   later: boolean;
-  alternatives: Itinerary[];
   nowMinutes: number;
-  drawn: ReturnType<typeof drawPlan>;
+  drawn: { parts: { color: string; positions: [number, number][] }[]; pins: { lat: number; lng: number; label: string }[] }[];
 }) {
+  const [active, setActive] = useState(0);
+  const plan = items[Math.min(active, Math.max(0, items.length - 1))];
   if (!plan) {
     return (
       <section className="mt-3 rounded-3xl bg-card p-4 ring-1 ring-foreground/10">
@@ -334,20 +337,42 @@ function PlanResult({
     );
   }
   const first = plan.legs[0];
-  const last = plan.legs[plan.legs.length - 1];
   const wait = first.departMinutes - nowMinutes;
+  const hasMap = drawn.some((route) => route.parts.length > 0);
   return (
     <section className="mt-3 overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/10">
       <div className="p-4">
         {later && (
           <p className="mb-2 text-sm text-muted-foreground">Danas više nema polaska. Prvi ovim rasporedom:</p>
         )}
-        <p className="font-display text-4xl leading-none">{later ? showTime(first.depart) : formatWait(wait)}</p>
-        <p className="mt-2 text-sm">
-          {first.code} iz {first.originName} u {showTime(first.depart)}
-          {plan.transfers > 0 ? ` · ${plan.transfers} presjedanje` : " · bez presjedanja"}
-          {" · "}dolazak {showTime(last.arrive)}
-        </p>
+        <p className="text-xs text-muted-foreground">Odaberi rutu. Bez presjedanja je opcija A.</p>
+        <ul className="mt-2 space-y-2">
+          {items.map((item, index) => {
+            const start = item.legs[0];
+            const end = item.legs[item.legs.length - 1];
+            const path = [start.originName, ...item.legs.map((leg) => leg.destinationName)].join(" → ");
+            const chosen = item === plan;
+            return (
+              <li key={`${start.directionId}-${start.depart}-${end.destinationStopId}`}>
+                <button
+                  type="button"
+                  onClick={() => setActive(index)}
+                  className={`w-full rounded-2xl px-3 py-2 text-left text-sm ${chosen ? "bg-accent ring-1 ring-foreground/15" : "bg-muted"}`}
+                >
+                  <span className="font-medium">{String.fromCharCode(65 + index)}</span>
+                  <span className="text-muted-foreground"> · {item.transfers === 0 ? "bez presjedanja" : "presjedanje"}</span>
+                  <span className="mt-0.5 block">{path}</span>
+                  <span className="text-muted-foreground">
+                    {item.legs.map((leg) => leg.code).join(" → ")} · {showTime(start.depart)}
+                    {!later && ` · ${formatWait(start.departMinutes - nowMinutes)}`}
+                    {" · "}dolazak {showTime(end.arrive)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="font-display mt-4 text-4xl leading-none">{later ? showTime(first.depart) : formatWait(wait)}</p>
         <ol className="mt-4 space-y-3">
           {plan.legs.map((leg, index) => {
             const previous = plan.legs[index - 1];
@@ -390,31 +415,12 @@ function PlanResult({
           Otvori na karti
         </Button>
       </div>
-      {drawn && drawn.parts.length > 0 && (
+      {hasMap && (
         <div className="border-t">
-          <RouteMap parts={drawn.parts} pins={drawn.pins} />
-        </div>
-      )}
-      {alternatives.length > 0 && (
-        <div className="border-t px-4 py-3">
-          <p className="text-xs text-muted-foreground">Kasniji polasci</p>
-          <ul className="mt-2 space-y-2">
-            {alternatives.map((item) => {
-              const start = item.legs[0];
-              const end = item.legs[item.legs.length - 1];
-              return (
-                <li key={`${start.depart}-${start.code}-${end.arrive}`} className="text-sm">
-                  <span className="font-medium tabular-nums">{showTime(start.depart)}</span>
-                  {!later && <span className="text-primary"> · {formatWait(start.departMinutes - nowMinutes)}</span>}
-                  <span className="text-muted-foreground">
-                    {" "}
-                    {item.legs.map((leg) => leg.code).join(" → ")} · dolazak {showTime(end.arrive)}
-                    {item.transfers > 0 ? " · presjedanje" : ""}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          {items.length > 1 && (
+            <p className="px-4 pt-3 text-xs text-muted-foreground">Sve opcije su na karti. Dodirni liniju da je odabereš.</p>
+          )}
+          <RouteMap routes={drawn} active={Math.min(active, drawn.length - 1)} onSelect={setActive} />
         </div>
       )}
     </section>

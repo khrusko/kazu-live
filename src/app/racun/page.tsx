@@ -5,27 +5,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { CATEGORIES, TICKET_TYPES, money } from "@/lib/fares";
+import { CATEGORIES } from "@/lib/fares";
 import { useKazu } from "@/components/providers";
-import { formatWhen } from "@/lib/time";
-import type { CategoryId, Ticket } from "@/lib/types";
+import type { CategoryId } from "@/lib/types";
 
 export default function AccountPage() {
   const router = useRouter();
   const { user, setUser, network, favoriteLineIds, toggleLine, loading } = useKazu();
-  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [category, setCategory] = useState<CategoryId>("puni");
 
   useEffect(() => {
     if (user) setCategory(user.category);
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    fetch("/api/tickets")
-      .then((response) => response.json())
-      .then((data) => setTickets(data.tickets ?? []))
-      .catch(() => setTickets([]));
   }, [user]);
 
   if (loading) return <p className="p-8 text-sm">Učitavam račun…</p>;
@@ -33,7 +23,7 @@ export default function AccountPage() {
     return (
       <div className="mx-auto max-w-md px-4 py-12">
         <h1 className="font-display text-3xl">Račun</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Prijavite se da vidite karte i omiljene linije.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Prijavite se da vidite račun i omiljene linije.</p>
         <Button className="mt-4" size="lg" render={<Link href="/prijava?next=/racun" />}>Prijava</Button>
       </div>
     );
@@ -72,7 +62,7 @@ export default function AccountPage() {
 
       <section className="mt-6 rounded-2xl bg-card p-4 ring-1 ring-foreground/10">
         <h2 className="font-medium">Kategorija popusta</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Ne zamjenjuje službeni zahtjev za povlaštenu kartu. Na blagajni se i dalje provjerava dokument.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Služi kao bilješka uz račun. Ne zamjenjuje dokument na blagajni.</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <select className="h-9 rounded-lg border bg-background px-2 text-sm" value={category} onChange={(event) => setCategory(event.target.value as CategoryId)}>
             {CATEGORIES.map((item) => (
@@ -101,21 +91,6 @@ export default function AccountPage() {
         </ul>
       </section>
 
-      <section className="mt-4">
-        <h2 className="font-medium">Izdane karte</h2>
-        {tickets.length === 0 && <p className="mt-2 text-sm text-muted-foreground">Nema karata. <Link href="/karte" className="text-primary">Kupi prvu</Link>.</p>}
-        <ul className="mt-2 space-y-2">
-          {tickets.map((ticket) => (
-            <li key={ticket.id} className="rounded-2xl bg-card px-4 py-3 ring-1 ring-foreground/10">
-              <p className="font-medium">{ticket.originName} → {ticket.destinationName}</p>
-              <p className="text-sm text-muted-foreground">
-                {ticket.lineCode} · {TICKET_TYPES.find((item) => item.id === ticket.ticketType)?.label} · zona {ticket.zone} · {money(ticket.price)}
-              </p>
-              <p className="text-xs text-muted-foreground">{formatWhen(ticket.createdAt)} · {ticket.id} · plaćanje uskoro</p>
-            </li>
-          ))}
-        </ul>
-      </section>
     </div>
   );
 }

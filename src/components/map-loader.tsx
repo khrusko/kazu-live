@@ -6,7 +6,7 @@ import { Suspense } from "react";
 const MapApp = dynamic(() => import("@/components/map-app").then((mod) => mod.MapApp), {
   ssr: false,
   loading: () => (
-    <div className="grid h-[calc(100dvh-3.5rem)] place-items-center text-sm text-muted-foreground">
+    <div className="grid h-[calc(100dvh-5.5rem)] place-items-center text-sm text-muted-foreground">
       Učitavam kartu…
     </div>
   ),
@@ -14,7 +14,7 @@ const MapApp = dynamic(() => import("@/components/map-app").then((mod) => mod.Ma
 
 export function MapLoader() {
   return (
-    <Suspense fallback={<div className="grid h-[calc(100dvh-3.5rem)] place-items-center text-sm">Učitavam kartu…</div>}>
+    <Suspense fallback={<div className="grid h-[calc(100dvh-5.5rem)] place-items-center text-sm">Učitavam kartu…</div>}>
       <MapApp />
     </Suspense>
   );

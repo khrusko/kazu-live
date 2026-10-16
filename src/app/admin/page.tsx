@@ -27,7 +27,6 @@ export default function AdminHome() {
         <Link href="/admin/obavijesti" className="rounded-full bg-primary px-3 py-1.5 text-sm text-primary-foreground">
           Nova obavijest
         </Link>
-        <Link href="/karte" className="rounded-full bg-muted px-3 py-1.5 text-sm">Karte putnika</Link>
       </div>
       <div className="mt-8 space-y-6">
         {["A", "B", "C", "D", "E"].map((group) => (

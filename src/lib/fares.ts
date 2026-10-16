@@ -130,8 +130,8 @@ export const SALES_POINTS: SalesPoint[] = [
     place: "Karlovac · Arriva",
     address: "Prilaz Većeslava Holjevca 2",
     hours: "Radnim danom 5:30–21:00. Kartomat za jednokratne i dnevne karte radi 0–24.",
-    lat: 45.48876,
-    lng: 15.55062,
+    lat: 45.48815230992074,
+    lng: 15.55044368257112,
   },
   {
     id: "ogulin",

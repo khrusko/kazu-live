@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { cookies } from "next/headers";
+import rawRoads from "../../data/roads.json";
 import { hashPassword, readSession, SESSION_COOKIE } from "./auth";
 import type { Announcement, Network, PublicUser, Ticket, UserRecord } from "./types";
 
@@ -15,15 +16,22 @@ const networkPath = path.join(dataDir, "network.json");
 const roadsPath = path.join(dataDir, "roads.json");
 
 type RoadShape = { points: [number, number][]; anchors: number[] };
+const bundledRoads = rawRoads as unknown as Record<string, RoadShape>;
 let roadsCache: { mtime: number; roads: Record<string, RoadShape> } | null = null;
 
 function readRoads(): Record<string, RoadShape> {
-  if (!fs.existsSync(roadsPath)) return {};
-  const mtime = fs.statSync(roadsPath).mtimeMs;
-  if (roadsCache && roadsCache.mtime === mtime) return roadsCache.roads;
-  const roads = JSON.parse(fs.readFileSync(roadsPath, "utf8")) as Record<string, RoadShape>;
-  roadsCache = { mtime, roads };
-  return roads;
+  try {
+    if (fs.existsSync(roadsPath)) {
+      const mtime = fs.statSync(roadsPath).mtimeMs;
+      if (roadsCache && roadsCache.mtime === mtime) return roadsCache.roads;
+      const roads = JSON.parse(fs.readFileSync(roadsPath, "utf8")) as Record<string, RoadShape>;
+      roadsCache = { mtime, roads };
+      return roads;
+    }
+  } catch {
+    // The deployed function image can omit data/roads.json. The imported copy still has the shapes.
+  }
+  return bundledRoads;
 }
 
 const globalStore = globalThis as typeof globalThis & {
@@ -153,8 +161,20 @@ export function updateStore<T>(fn: (store: Store) => T, bump = true): Promise<T>
   return run;
 }
 
+let colorCache: { mtime: number; colors: Map<string, string> } | null = null;
+
+function lineColors(): Map<string, string> {
+  const mtime = fs.statSync(networkPath).mtimeMs;
+  if (colorCache && colorCache.mtime === mtime) return colorCache.colors;
+  const raw = JSON.parse(fs.readFileSync(networkPath, "utf8")) as { lines?: { id: string; color?: string }[] };
+  const colors = new Map((raw.lines ?? []).filter((line) => line.color).map((line) => [line.id, line.color as string]));
+  colorCache = { mtime, colors };
+  return colors;
+}
+
 export function networkView(store: Store): Network {
   const roads = readRoads();
+  const colors = lineColors();
   return {
     version: store.version,
     updatedAt: store.updatedAt,
@@ -163,6 +183,7 @@ export function networkView(store: Store): Network {
     stops: store.stops,
     lines: store.lines.map((line) => ({
       ...line,
+      color: colors.get(line.id) ?? line.color,
       directions: line.directions.map((direction) => {
         const road = roads[direction.id];
         if (!road?.points?.length || road.anchors?.length !== direction.stops.length) return direction;

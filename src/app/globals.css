@@ -133,6 +133,11 @@
   font-family: var(--font-fraunces), Georgia, serif;
 }
 
+.font-pdark {
+  font-family: var(--font-pdark), var(--font-figtree), ui-sans-serif, sans-serif;
+  letter-spacing: 0.03em;
+}
+
 .leaflet-container {
   height: 100%;
   width: 100%;
