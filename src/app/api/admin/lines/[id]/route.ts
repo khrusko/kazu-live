@@ -10,7 +10,7 @@ const DAYS: DayType[] = ["radni", "subota", "nedjelja"];
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
   if (!user || user.role !== "admin") {
-    return NextResponse.json({ error: "Samo dispečer može mijenjati vozni red." }, { status: 403 });
+    return NextResponse.json({ error: "Samo administrator može mijenjati vozni red." }, { status: 403 });
   }
   const { id } = await context.params;
   const body = (await request.json()) as {

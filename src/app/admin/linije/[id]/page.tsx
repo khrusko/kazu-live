@@ -31,7 +31,7 @@ export default function AdminLinePage() {
 
   if (loading) return <p className="p-8 text-sm">Učitavam…</p>;
   if (!user || user.role !== "admin") {
-    return <p className="p-8 text-sm">Samo dispečer. <Link href="/prijava?next=/admin" className="text-primary">Prijava</Link></p>;
+    return <p className="p-8 text-sm">Samo administrator. <Link href="/prijava?next=/admin" className="text-primary">Prijava</Link></p>;
   }
   if (!line || !directions) return <p className="p-8 text-sm">Linija nije nađena.</p>;
   const direction = directions.find((item) => item.id === directionId) ?? directions[0];
@@ -86,7 +86,7 @@ export default function AdminLinePage() {
         announce: announce
           ? {
               title: `Izmjena voznog reda linije ${line!.code}`,
-              body: `Dispečer je ažurirao polaske linije ${line!.code} (${line!.name}). Provjerite vozni red na karti.`,
+              body: `Administrator je ažurirao polaske linije ${line!.code} (${line!.name}). Provjerite vozni red na karti.`,
             }
           : null,
       };
@@ -111,7 +111,7 @@ export default function AdminLinePage() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-6">
-      <Link href="/admin" className="text-sm text-muted-foreground">Dispečer</Link>
+      <Link href="/admin" className="text-sm text-muted-foreground">Administrator</Link>
       <h1 className="font-display mt-1 text-3xl">{line.code} · {line.name}</h1>
       <div className="mt-3 flex flex-wrap gap-2">
         {directions.map((item) => (

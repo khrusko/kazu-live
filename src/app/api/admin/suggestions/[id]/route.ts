@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
   if (!user || user.role !== "admin") {
-    return NextResponse.json({ error: "Samo dispečer pregledava prijedloge." }, { status: 403 });
+    return NextResponse.json({ error: "Samo administrator pregledava prijedloge." }, { status: 403 });
   }
   const { id } = await context.params;
   const body = (await request.json().catch(() => null)) as { action?: "prihvati" | "odbij" } | null;

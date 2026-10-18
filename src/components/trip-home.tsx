@@ -11,8 +11,8 @@ import { useKazu } from "@/components/providers";
 import { fold, formatMeters, pickNearest } from "@/lib/geo";
 import { planJourneys, type Itinerary } from "@/lib/plan";
 import { departuresForStop, legShape, linesAtStop, stopOnShape } from "@/lib/schedule";
-import { DAY_LABEL, formatWait, showTime, zagrebParts } from "@/lib/time";
-import type { Line, Stop } from "@/lib/types";
+import { DAY_LABEL, formatWait, showTime, toMinutes, zagrebParts } from "@/lib/time";
+import type { DayType, Line, Stop } from "@/lib/types";
 
 function formatDuration(minutes: number) {
   if (minutes < 60) return `${minutes} min`;
@@ -31,6 +31,8 @@ export function TripHome() {
   const router = useRouter();
   const { network, loading, error } = useKazu();
   const [now, setNow] = useState(() => zagrebParts());
+  const [dayChoice, setDayChoice] = useState<DayType | null>(null);
+  const [timeChoice, setTimeChoice] = useState("");
   const [loc, setLoc] = useState<"idle" | "pending" | "ok" | "denied" | "unsupported">("idle");
   const [originId, setOriginId] = useState<string | null>(null);
   const [meters, setMeters] = useState<number | null>(null);
@@ -105,18 +107,22 @@ export function TripHome() {
       ? stops.filter((stop) => stop.id !== originId && fold(stop.name).includes(fold(destQuery.trim()))).slice(0, 8)
       : [];
 
+  const activeDay = dayChoice ?? now.day;
+  const activeMinutes = timeChoice ? toMinutes(timeChoice) : now.minutes;
+  const customWhen = dayChoice != null || timeChoice !== "";
+  const showWait = activeDay === now.day && !timeChoice;
   const departures = useMemo(
-    () => (origin ? departuresForStop(lines, stops, origin.id, now.day).filter((item) => item.minutes >= now.minutes).slice(0, 4) : []),
-    [origin, lines, stops, now.day, now.minutes],
+    () => (origin ? departuresForStop(lines, stops, origin.id, activeDay).filter((item) => item.minutes >= activeMinutes).slice(0, 4) : []),
+    [origin, lines, stops, activeDay, activeMinutes],
   );
   const serving = origin ? linesAtStop(lines, origin.id) : [];
 
   const planned = useMemo(() => {
     if (!originId || !destId) return { items: [] as Itinerary[], later: false };
-    const upcoming = planJourneys(lines, stops, originId, destId, now.day, now.minutes);
+    const upcoming = planJourneys(lines, stops, originId, destId, activeDay, activeMinutes);
     if (upcoming.length) return { items: upcoming, later: false };
-    return { items: planJourneys(lines, stops, originId, destId, now.day, 0), later: true };
-  }, [lines, stops, originId, destId, now.day, now.minutes]);
+    return { items: planJourneys(lines, stops, originId, destId, activeDay, 0), later: true };
+  }, [lines, stops, originId, destId, activeDay, activeMinutes]);
 
   const drawn = useMemo(
     () => planned.items.map((item) => drawPlan(item, lines) ?? { parts: [], pins: [] }),
@@ -137,6 +143,51 @@ export function TripHome() {
       <p className="mt-2 text-sm text-muted-foreground">
         Lokacija služi samo u svrhu pronalaska najbližeg autobusnog stajališta.
       </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {(["radni", "subota", "nedjelja"] as DayType[]).map((day) => (
+          <button
+            key={day}
+            type="button"
+            onClick={() => setDayChoice(day === now.day ? null : day)}
+            className={`rounded-full px-3 py-2 text-sm ${activeDay === day ? "bg-primary text-primary-foreground" : "bg-card ring-1 ring-foreground/10"}`}
+          >
+            {DAY_LABEL[day]}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <span>Polazak od</span>
+        <label className="sr-only" htmlFor="depart-hour">Sat</label>
+        <select
+          id="depart-hour"
+          className="h-10 rounded-xl border bg-card px-2"
+          value={(timeChoice || now.clock).slice(0, 2)}
+          onChange={(event) => setTimeChoice(`${event.target.value}:${(timeChoice || now.clock).slice(3, 5)}`)}
+        >
+          {Array.from({ length: 24 }, (_, hour) => {
+            const value = String(hour).padStart(2, "0");
+            return <option key={value} value={value}>{value}</option>;
+          })}
+        </select>
+        <span>:</span>
+        <label className="sr-only" htmlFor="depart-minute">Minuta</label>
+        <select
+          id="depart-minute"
+          className="h-10 rounded-xl border bg-card px-2"
+          value={(timeChoice || now.clock).slice(3, 5)}
+          onChange={(event) => setTimeChoice(`${(timeChoice || now.clock).slice(0, 2)}:${event.target.value}`)}
+        >
+          {Array.from({ length: 60 }, (_, minute) => {
+            const value = String(minute).padStart(2, "0");
+            return <option key={value} value={value}>{value}</option>;
+          })}
+        </select>
+        {customWhen && (
+          <button type="button" className="text-primary" onClick={() => { setDayChoice(null); setTimeChoice(""); }}>
+            Trenutno vrijeme
+          </button>
+        )}
+      </div>
 
       <section className="mt-4 rounded-3xl bg-card p-4 ring-1 ring-foreground/10">
         {!origin || editingOrigin ? (
@@ -261,14 +312,16 @@ export function TripHome() {
             <section className="mt-3 rounded-3xl bg-card p-4 ring-1 ring-foreground/10">
               <h2 className="text-sm font-medium">Sljedeći polasci s ovog stajališta</h2>
               {departures.length === 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">Danas više nema polazaka u ovom rasporedu.</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {customWhen ? "Nema polaska nakon odabranog vremena." : "Danas više nema polazaka u ovom rasporedu."}
+                </p>
               ) : (
                 <ul className="mt-2 divide-y">
                   {departures.map((item) => (
                     <li key={`${item.tripId}-${item.time}-${item.directionId}`} className="flex items-center gap-3 py-3">
                       <span className="w-14 shrink-0">
                         <span className="block font-display text-xl leading-none">{showTime(item.time)}</span>
-                        <span className="text-xs text-primary">{formatWait(item.minutes - now.minutes)}</span>
+                        {showWait && <span className="text-xs text-primary">{formatWait(item.minutes - now.minutes)}</span>}
                       </span>
                       <span className="grid h-7 min-w-10 place-items-center rounded-full px-2 text-xs font-semibold text-white" style={{ background: item.color }}>
                         {item.code}
@@ -292,9 +345,22 @@ export function TripHome() {
 
           {destination && (
             <PlanResult
-              key={`${originId}|${destId}|${planned.later}|${planned.items.map((item) => item.legs.map((leg) => leg.directionId).join(">")).join(";")}`}
+              key={`${originId}|${destId}|${activeDay}|${activeMinutes}|${planned.later}|${planned.items.map((item) => item.legs.map((leg) => leg.directionId).join(">")).join(";")}`}
               items={planned.items}
               later={planned.later}
+              laterNote={
+                planned.later
+                  ? customWhen
+                    ? "Nakon odabranog vremena nema polaska. Prvi taj dan:"
+                    : "Danas više nema polaska. Prvi ovim rasporedom:"
+                  : null
+              }
+              hint={
+                customWhen
+                  ? `Rute od ${showTime(timeChoice || now.clock)} · ${DAY_LABEL[activeDay]}. Odaberi jednu.`
+                  : "Sve rute od ovog trenutka. Odaberi jednu."
+              }
+              showWait={showWait}
               nowMinutes={now.minutes}
               drawn={drawn}
             />
@@ -326,11 +392,17 @@ function drawPlan(plan: Itinerary | undefined, lines: Line[]) {
 function PlanResult({
   items,
   later,
+  laterNote,
+  hint,
+  showWait,
   nowMinutes,
   drawn,
 }: {
   items: Itinerary[];
   later: boolean;
+  laterNote: string | null;
+  hint: string;
+  showWait: boolean;
   nowMinutes: number;
   drawn: { parts: { color: string; code: string; positions: [number, number][] }[]; pins: { lat: number; lng: number; label: string }[] }[];
 }) {
@@ -349,10 +421,8 @@ function PlanResult({
   return (
     <section className="mt-3 overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/10">
       <div className="p-4">
-        {later && (
-          <p className="mb-2 text-sm text-muted-foreground">Danas više nema polaska. Prvi ovim rasporedom:</p>
-        )}
-        <p className="text-xs text-muted-foreground">Sve rute od ovog trenutka. Odaberi jednu.</p>
+        {laterNote && <p className="mb-2 text-sm text-muted-foreground">{laterNote}</p>}
+        <p className="text-xs text-muted-foreground">{hint}</p>
         <ul className="mt-2 space-y-2">
           {items.map((item, index) => {
             const start = item.legs[0];
@@ -371,7 +441,7 @@ function PlanResult({
                   <span className="mt-0.5 block">{path}</span>
                   <span className="text-muted-foreground">
                     {item.legs.map((leg) => `Linija ${leg.code}`).join(" → ")} · {showTime(start.depart)} Polazak
-                    {!later && ` · ${formatWait(start.departMinutes - nowMinutes)}`}
+                    {showWait && !later && ` · ${formatWait(start.departMinutes - nowMinutes)}`}
                     {" · "}ukupno trajanje putovanja {formatDuration(item.arriveMinutes - item.departMinutes)}
                     {" · "}dolazak {showTime(end.arrive)}
                   </span>
@@ -383,7 +453,7 @@ function PlanResult({
         <div className="mt-4 flex flex-wrap items-end gap-x-3 gap-y-1">
           <p className="font-display text-4xl leading-none">{showTime(first.depart)}</p>
           <div className="pb-0.5 text-sm">
-            <p className="font-medium">Polazak{!later ? ` · ${formatWait(wait)}` : ""}</p>
+            <p className="font-medium">Polazak{showWait && !later ? ` · ${formatWait(wait)}` : ""}</p>
             <p className="text-muted-foreground">ukupno trajanje putovanja {formatDuration(plan.arriveMinutes - plan.departMinutes)}</p>
           </div>
         </div>
@@ -408,7 +478,7 @@ function PlanResult({
                     <p>
                       <span className="font-medium">{leg.originName}</span>{" "}
                       <span className="tabular-nums">{showTime(leg.depart)}</span>
-                      {index === 0 && !later && <span className="text-primary"> · {formatWait(wait)}</span>}
+                      {index === 0 && showWait && !later && <span className="text-primary"> · {formatWait(wait)}</span>}
                     </p>
                     <p className="text-muted-foreground">prema {leg.headsign}</p>
                     <p>
