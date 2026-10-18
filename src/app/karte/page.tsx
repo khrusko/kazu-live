@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Karte · Sizel",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Karte",
+  description:
+    "Informacije o kupnji autobusnih karata Karlovačke županije. Na Sizel Busevima kupovina nije dostupna.",
+  path: "/karte",
+});
 
 export default function TicketsPage() {
   return (
