@@ -321,7 +321,7 @@ export function MapApp() {
           )}
         </div>
         <p className="border-t px-4 py-2 text-[11px] leading-snug text-muted-foreground">
-          Lokacije još nisu točno unesene, pa stajališta na karti mogu biti krivo označena.
+          Stajališta u Karlovcu preuzeta su s GIS-a Grada Karlovca. Ostala su još približno postavljena.
         </p>
       </aside>
     </div>
