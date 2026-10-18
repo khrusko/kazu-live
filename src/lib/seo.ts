@@ -128,7 +128,7 @@ export function websiteJsonLd() {
         legalName: "Sizel j.d.o.o.",
         url: "https://sizel.eu",
         email: "info@sizel.eu",
-        logo: absoluteUrl("/icon.svg"),
+        logo: absoluteUrl("/sizel-logo.jpg"),
       },
       {
         "@type": "WebApplication",

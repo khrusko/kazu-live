@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bell, Bus, Menu, X } from "lucide-react";
+import { Bell, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useKazu } from "@/components/providers";
 import { formatWhen } from "@/lib/time";
@@ -66,10 +67,15 @@ export function Header() {
   return (
     <header className="z-40 shrink-0 border-b border-white/10 bg-[oklch(0.34_0.06_168)] text-white">
       <div className="flex min-h-14 items-center gap-3 px-3 py-1.5 sm:px-5">
-        <Link href="/" className="flex items-center gap-2 pr-2">
-          <span className="grid size-8 place-items-center rounded-full bg-white/15">
-            <Bus className="size-4" />
-          </span>
+        <Link href="/" className="flex items-center gap-2.5 pr-2">
+          <Image
+            src="/sizel-logo.jpg"
+            alt="Sizel"
+            width={40}
+            height={40}
+            className="size-10 shrink-0 rounded-[10px] ring-1 ring-white/15"
+            priority
+          />
           <span className="leading-tight">
             <span className="font-display block text-[15px] tracking-tight">Sizel</span>
             <span className="block text-[10px] leading-tight text-white/85">
