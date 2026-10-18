@@ -100,6 +100,17 @@ export type UserRecord = PublicUser & {
   passwordHash: string;
 };
 
+export type StopSuggestion = {
+  id: string;
+  stopId: string;
+  lat: number;
+  lng: number;
+  note: string;
+  status: "ceka" | "prihvaceno" | "odbijeno";
+  createdAt: string;
+  byName: string | null;
+};
+
 export type Network = {
   version: number;
   updatedAt: string;

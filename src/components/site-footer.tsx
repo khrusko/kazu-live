@@ -9,6 +9,9 @@ export function SiteFooter() {
           <a className="text-primary" href="mailto:info@sizel.eu">
             info@sizel.eu
           </a>
+          <Link href="/prijedlog" className="text-primary">
+            Prijedlog stajališta
+          </Link>
           <Link href="/privatnost" className="text-primary">
             Privatnost
           </Link>
