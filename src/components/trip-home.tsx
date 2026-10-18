@@ -14,6 +14,13 @@ import { departuresForStop, legShape, linesAtStop, stopOnShape } from "@/lib/sch
 import { DAY_LABEL, formatWait, showTime, zagrebParts } from "@/lib/time";
 import type { Line, Stop } from "@/lib/types";
 
+function formatDuration(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} h ${rest} min` : `${hours} h`;
+}
+
 const RouteMap = dynamic(() => import("@/components/route-map").then((mod) => mod.RouteMap), {
   ssr: false,
   loading: () => <div className="grid h-56 place-items-center text-sm text-muted-foreground sm:h-72">Učitavam kartu rute…</div>,
@@ -363,8 +370,9 @@ function PlanResult({
                   <span className="text-muted-foreground"> · {item.transfers === 0 ? "bez presjedanja" : "presjedanje"}</span>
                   <span className="mt-0.5 block">{path}</span>
                   <span className="text-muted-foreground">
-                    {item.legs.map((leg) => `Linija ${leg.code}`).join(" → ")} · {showTime(start.depart)}
+                    {item.legs.map((leg) => `Linija ${leg.code}`).join(" → ")} · {showTime(start.depart)} Polazak
                     {!later && ` · ${formatWait(start.departMinutes - nowMinutes)}`}
+                    {" · "}ukupno trajanje putovanja {formatDuration(item.arriveMinutes - item.departMinutes)}
                     {" · "}dolazak {showTime(end.arrive)}
                   </span>
                 </button>
@@ -372,7 +380,13 @@ function PlanResult({
             );
           })}
         </ul>
-        <p className="font-display mt-4 text-4xl leading-none">{later ? showTime(first.depart) : formatWait(wait)}</p>
+        <div className="mt-4 flex flex-wrap items-end gap-x-3 gap-y-1">
+          <p className="font-display text-4xl leading-none">{showTime(first.depart)}</p>
+          <div className="pb-0.5 text-sm">
+            <p className="font-medium">Polazak{!later ? ` · ${formatWait(wait)}` : ""}</p>
+            <p className="text-muted-foreground">ukupno trajanje putovanja {formatDuration(plan.arriveMinutes - plan.departMinutes)}</p>
+          </div>
+        </div>
         <ol className="mt-4 space-y-3">
           {plan.legs.map((leg, index) => {
             const previous = plan.legs[index - 1];
