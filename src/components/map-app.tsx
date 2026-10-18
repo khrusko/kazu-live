@@ -238,6 +238,17 @@ export function MapApp() {
           {selectedLine && !selectedStop && <FitLine lineId={selectedLine.id} points={linePoints} />}
         </MapContainer>
         <BasemapSwitch satellite={satellite} onChange={setSatellite} className="absolute top-3 right-3 z-[500]" />
+        {selectedLine && (
+          <div className="absolute top-3 left-14 z-[500] flex max-w-[calc(100%-8.5rem)] items-center gap-2 rounded-2xl bg-card py-1.5 pr-1.5 pl-2 shadow-lg ring-1 ring-foreground/10">
+            <span className="grid h-6 min-w-9 shrink-0 place-items-center rounded-full px-1.5 text-[11px] font-semibold text-white" style={{ background: selectedLine.color }}>
+              {selectedLine.code}
+            </span>
+            <span className="min-w-0 truncate text-sm font-medium">{selectedLine.name}</span>
+            <Link href={`/linije/${selectedLine.id}`} className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">
+              Vidi raspored
+            </Link>
+          </div>
+        )}
       </div>
 
       <aside className="absolute inset-x-0 bottom-0 z-20 flex max-h-[52%] flex-col rounded-t-3xl bg-card pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_40px_rgba(30,40,30,0.18)] ring-1 ring-foreground/10 sm:max-h-[58%] lg:inset-y-0 lg:left-0 lg:max-h-none lg:w-[390px] lg:rounded-none lg:pb-0">
@@ -469,7 +480,7 @@ function LineList({
       {groups.map((group) => {
         const items = lines.filter((line) => line.group === group);
         if (!items.length) return null;
-        const open = !closed[group];
+        const open = !closed[group] || items.some((line) => line.id === activeId);
         return (
           <section key={group}>
             <button
@@ -483,16 +494,25 @@ function LineList({
             </button>
             {open && <ul className="space-y-1">
               {items.map((line) => (
-                <li key={line.id} className={`flex items-center gap-2 rounded-xl px-2 py-1.5 ${activeId === line.id ? "bg-muted" : ""}`}>
-                  <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => onPick(line.id)}>
-                    <span className="grid h-6 min-w-9 place-items-center rounded-full px-1.5 text-[11px] font-semibold text-white" style={{ background: line.color }}>
-                      {line.code}
-                    </span>
-                    <span className="truncate text-sm">{line.name}</span>
-                  </button>
-                  <button type="button" aria-label="Favorit" onClick={() => onHeart(line.id)} className="grid size-7 place-items-center">
-                    <Heart className={`size-4 ${favorites.includes(line.id) ? "fill-current text-[oklch(0.55_0.16_35)]" : "text-muted-foreground"}`} />
-                  </button>
+                <li key={line.id} className={`rounded-xl ${activeId === line.id ? "bg-muted" : ""}`}>
+                  <div className="flex items-center gap-2 px-2 py-1.5">
+                    <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => onPick(line.id)}>
+                      <span className="grid h-6 min-w-9 place-items-center rounded-full px-1.5 text-[11px] font-semibold text-white" style={{ background: line.color }}>
+                        {line.code}
+                      </span>
+                      <span className="truncate text-sm">{line.name}</span>
+                    </button>
+                    <button type="button" aria-label="Favorit" onClick={() => onHeart(line.id)} className="grid size-7 place-items-center">
+                      <Heart className={`size-4 ${favorites.includes(line.id) ? "fill-current text-[oklch(0.55_0.16_35)]" : "text-muted-foreground"}`} />
+                    </button>
+                  </div>
+                  {activeId === line.id && (
+                    <div className="px-2 pb-2">
+                      <Link href={`/linije/${line.id}`} className="inline-flex rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">
+                        Vidi raspored
+                      </Link>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>}

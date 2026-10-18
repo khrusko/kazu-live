@@ -126,6 +126,33 @@ function linksBetween(from: Appear, to: Appear, named: Map<string, Stop>): Link[
   return links;
 }
 
+function tripReachesStop(direction: Direction, trip: Trip, fromIndex: number, stopId: string, named: Map<string, Stop>) {
+  const target = named.get(stopId);
+  for (let index = fromIndex; index < direction.stops.length; index += 1) {
+    if (!trip.times[index]) continue;
+    const id = direction.stops[index].stopId;
+    if (id === stopId) return true;
+    const stop = named.get(id);
+    if (target && stop && distanceMeters(target, stop) <= SAME_PLACE_M) return true;
+  }
+  return false;
+}
+
+function leavesRideThatReachesDestination(item: Itinerary, directs: Itinerary[]) {
+  const first = item.legs[0];
+  return directs.some((direct) => {
+    if (direct.transfers !== 0) return false;
+    const ride = direct.legs[0];
+    return (
+      ride.lineId === first.lineId &&
+      ride.directionId === first.directionId &&
+      ride.depart === first.depart &&
+      ride.originStopId === first.originStopId &&
+      ride.destinationIndex > first.destinationIndex
+    );
+  });
+}
+
 function earliestSecond(to: Appear, trip: Trip, ready: number, board: number, named: Map<string, Stop>) {
   let best: PlanLeg | null = null;
   for (const candidate of to.direction.trips) {
@@ -154,6 +181,7 @@ export function planJourneys(
   function push(item: Itinerary) {
     if (item.departMinutes < fromMinutes) return;
     if (item.arriveMinutes - item.departMinutes > 300) return;
+    if (item.transfers > 0 && leavesRideThatReachesDestination(item, found)) return;
     const key = item.legs.map((leg) => `${leg.code}|${leg.depart}|${leg.originStopId}|${leg.destinationStopId}|${leg.arrive}`).join(">");
     if (seen.has(key)) return;
     seen.add(key);
@@ -179,6 +207,7 @@ export function planJourneys(
       if (!links.length) continue;
       for (const trip of from.direction.trips) {
         if (trip.day !== day) continue;
+        if (tripReachesStop(from.direction, trip, from.index + 1, destinationId, named)) continue;
         const bestByPath = new Map<string, Itinerary>();
         for (const link of links) {
           if (to.direction.stops.slice(link.board + 1, to.index).some((stop) => stop.stopId === originId)) continue;

@@ -58,10 +58,6 @@ function LoginForm() {
       <p className="mt-4 text-sm">
         Nemaš račun? <Link href="/registracija" className="text-primary">Registracija</Link>
       </p>
-      <div className="mt-6 rounded-2xl bg-muted p-3 text-xs leading-relaxed text-muted-foreground">
-        <p>Dispečer: admin@kazide.hr / KazuAdmin2026</p>
-        <p>Putnik: ana@kazide.hr / Putnik2026</p>
-      </div>
     </div>
   );
 }
