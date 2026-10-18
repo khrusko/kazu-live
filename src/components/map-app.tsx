@@ -239,11 +239,11 @@ export function MapApp() {
         </MapContainer>
         <BasemapSwitch satellite={satellite} onChange={setSatellite} className="absolute top-3 right-3 z-[500]" />
         {selectedLine && (
-          <div className="absolute top-3 left-14 z-[500] flex max-w-[calc(100%-8.5rem)] items-center gap-2 rounded-2xl bg-card py-1.5 pr-1.5 pl-2 shadow-lg ring-1 ring-foreground/10">
+          <div className="absolute top-3 left-14 z-[500] flex w-max max-w-[min(20rem,calc(100%-13rem))] items-center gap-2 rounded-2xl bg-card py-1.5 pr-1.5 pl-2 shadow-lg ring-1 ring-foreground/10">
             <span className="grid h-6 min-w-9 shrink-0 place-items-center rounded-full px-1.5 text-[11px] font-semibold text-white" style={{ background: selectedLine.color }}>
               {selectedLine.code}
             </span>
-            <span className="min-w-0 truncate text-sm font-medium">{selectedLine.name}</span>
+            <span className="hidden min-w-0 truncate text-sm font-medium sm:inline">{selectedLine.name}</span>
             <Link href={`/linije/${selectedLine.id}`} className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">
               Vidi raspored
             </Link>
