@@ -158,7 +158,9 @@ function repairDetours(points, waypointAnchors, groups, legs) {
     const previousKm = groups[index - 1].kms[groups[index - 1].kms.length - 1];
     const km = Math.max(0.2, groups[index].kms[0] - previousKm);
     const roadKm = legs[index - 1] ?? km;
-    const detour = roadKm - km > 3 && roadKm > km * 2.2 + 1.5;
+    // Only drop a driving leg when it is a real wrong-road detour.
+    // Winding county roads are longer than the timetable kilometre and must stay.
+    const detour = roadKm - km > 12 && roadKm > km * 3.5 + 8;
     const start = waypointAnchors[index - 1];
     const end = waypointAnchors[index];
     if (detour || end < start) {

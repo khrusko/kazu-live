@@ -138,6 +138,13 @@
   width: 100%;
   background: #e5efe8;
   font-family: inherit;
+  z-index: 0;
+}
+
+/* Leaflet panes use z-index 200–1000 and escape the map box. Keep the
+   cookie notice above the tiles while the map is panned or zoomed. */
+.sizel-cookie {
+  z-index: 10000;
 }
 
 /* Leaflet paints tiles with plus-lighter, which drops dark orthophoto
