@@ -158,7 +158,8 @@
   border: none;
 }
 
-.leaflet-div-icon.office-pin {
+.leaflet-div-icon.office-pin,
+.leaflet-div-icon.edit-pin {
   background: transparent;
   border: none;
 }

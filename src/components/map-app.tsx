@@ -620,6 +620,9 @@ function StopDetail({
             Linija {line.code}
           </Button>
         ))}
+        <Button size="lg" variant="outline" nativeButton={false} render={<Link href={`/prijedlog?stop=${stop.id}`} />}>
+          Predloži točnu lokaciju
+        </Button>
       </div>
     </div>
   );

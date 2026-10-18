@@ -23,8 +23,14 @@ export default function AdminHome() {
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         Spremljeni polazak putnici vide u roku od nekoliko sekundi, bez novog PDF-a. Uz izmjenu možete objaviti obavijest za omiljene linije.
       </p>
-      <div className="mt-4 flex gap-2">
-        <Link href="/admin/obavijesti" className="rounded-full bg-primary px-3 py-1.5 text-sm text-primary-foreground">
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href="/admin/karta" className="rounded-full bg-primary px-3 py-1.5 text-sm text-primary-foreground">
+          Stajališta i ceste
+        </Link>
+        <Link href="/admin/prijedlozi" className="rounded-full bg-muted px-3 py-1.5 text-sm">
+          Prijedlozi lokacija
+        </Link>
+        <Link href="/admin/obavijesti" className="rounded-full bg-muted px-3 py-1.5 text-sm">
           Nova obavijest
         </Link>
       </div>
