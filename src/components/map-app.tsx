@@ -29,6 +29,24 @@ function busIcon(code: string, color: string) {
   });
 }
 
+function liveBusIcon(code: string, color: string, heading: number) {
+  const nose = Number.isFinite(heading) ? Math.round(heading) : 0;
+  const label = code.replace(/[&<>"]/g, "");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+    <g transform="rotate(${nose} 24 24)">
+      <polygon points="24,3 33,17 15,17" fill="${color}" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+    </g>
+    <rect x="4" y="16" width="40" height="20" rx="7" fill="${color}" stroke="white" stroke-width="2"/>
+    <text x="24" y="30" text-anchor="middle" fill="white" font-size="11" font-family="Arial,sans-serif" font-weight="700">${label}</text>
+  </svg>`;
+  return L.divIcon({
+    className: "bus-live-pin",
+    html: svg,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+  });
+}
+
 function officeIcon() {
   return L.divIcon({
     className: "office-pin",
@@ -244,18 +262,26 @@ export function MapApp() {
             </Popup>
           )}
           {buses.map((bus) => (
-            <CircleMarker
-              key={bus.id}
-              center={[bus.lat, bus.lng]}
-              radius={6}
-              pathOptions={{ color: "#ffffff", weight: 2, fillColor: bus.color, fillOpacity: 1 }}
-            >
+            <Marker key={bus.id} position={[bus.lat, bus.lng]} icon={liveBusIcon(bus.code, bus.color, bus.heading)} zIndexOffset={700}>
               <Tooltip>
                 {bus.code} prema {bus.headsign}
                 <br />
-                {bus.from} → {bus.to}
+                {bus.from} {showTime(bus.fromTime)} → {bus.to} {showTime(bus.toTime)}
               </Tooltip>
-            </CircleMarker>
+              <Popup>
+                <div className="text-sm text-foreground">
+                  <p className="font-semibold">
+                    {bus.code} prema {bus.headsign}
+                  </p>
+                  <p className="mt-1">
+                    {bus.from} · {showTime(bus.fromTime)}
+                  </p>
+                  <p>
+                    {bus.to} · {showTime(bus.toTime)}
+                  </p>
+                </div>
+              </Popup>
+            </Marker>
           ))}
           <FlyTo lat={selectedStop?.lat ?? selectedOffice?.lat ?? null} lng={selectedStop?.lng ?? selectedOffice?.lng ?? null} />
           {selectedLine && !selectedStop && <FitLine lineId={selectedLine.id} points={linePoints} />}

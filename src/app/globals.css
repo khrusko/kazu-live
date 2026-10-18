@@ -153,7 +153,8 @@
   mix-blend-mode: normal !important;
 }
 
-.leaflet-div-icon.bus-pin {
+.leaflet-div-icon.bus-pin,
+.leaflet-div-icon.bus-live-pin {
   background: transparent;
   border: none;
 }

@@ -422,6 +422,8 @@ function PlanResult({
     <section className="mt-3 overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/10">
       <div className="p-4">
         {laterNote && <p className="mb-2 text-sm text-muted-foreground">{laterNote}</p>}
+        {items.length > 1 && (
+          <>
         <p className="text-xs text-muted-foreground">{hint}</p>
         <ul className="mt-2 space-y-2">
           {items.map((item, index) => {
@@ -442,7 +444,7 @@ function PlanResult({
                   <span className="text-muted-foreground">
                     {item.legs.map((leg) => `Linija ${leg.code}`).join(" → ")} · {showTime(start.depart)} Polazak
                     {showWait && !later && ` · ${formatWait(start.departMinutes - nowMinutes)}`}
-                    {" · "}ukupno trajanje putovanja {formatDuration(item.arriveMinutes - item.departMinutes)}
+                    {" · "}trajanje {formatDuration(item.arriveMinutes - item.departMinutes)}
                     {" · "}dolazak {showTime(end.arrive)}
                   </span>
                 </button>
@@ -450,50 +452,51 @@ function PlanResult({
             );
           })}
         </ul>
-        <div className="mt-4 flex flex-wrap items-end gap-x-3 gap-y-1">
-          <p className="font-display text-4xl leading-none">{showTime(first.depart)}</p>
-          <div className="pb-0.5 text-sm">
-            <p className="font-medium">Polazak{showWait && !later ? ` · ${formatWait(wait)}` : ""}</p>
-            <p className="text-muted-foreground">ukupno trajanje putovanja {formatDuration(plan.arriveMinutes - plan.departMinutes)}</p>
-          </div>
-        </div>
-        <ol className="mt-4 space-y-3">
+          </>
+        )}
+        <div className={items.length > 1 ? "mt-4 space-y-4" : "space-y-4"}>
           {plan.legs.map((leg, index) => {
             const previous = plan.legs[index - 1];
             const gap = previous ? Math.max(0, leg.departMinutes - previous.arriveMinutes - leg.walkMinutes) : 0;
+            const duration = leg.arriveMinutes - leg.departMinutes;
             return (
-              <li key={`${leg.directionId}-${leg.depart}-${leg.originStopId}`}>
+              <div key={`${leg.directionId}-${leg.depart}-${leg.originStopId}`}>
                 {index > 0 && (
-                  <p className="mb-2 rounded-2xl bg-muted px-3 py-2 text-sm">
+                  <p className="mb-3 rounded-2xl bg-muted px-3 py-2 text-sm">
                     Presjedanje
                     {leg.walkMinutes > 0 ? ` · pješke ${leg.walkMinutes} min do ${leg.originName}` : ` u ${leg.originName}`}
                     {gap > 0 ? ` · čekanje ${gap} min` : ""}
                   </p>
                 )}
-                <div className="flex gap-3">
-                  <span className="grid h-7 min-w-10 place-items-center rounded-full px-2 text-xs font-semibold text-white" style={{ background: leg.color }}>
-                    {leg.code}
+                <div className="grid grid-cols-[4.5rem_auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
+                  <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Polazak</span>
+                  <span className="grid h-12 min-w-[4.75rem] place-items-center rounded-full border-2 border-foreground px-3.5 font-display text-2xl leading-none">
+                    {showTime(leg.depart)}
                   </span>
-                  <div className="min-w-0 text-sm">
-                    <p>
-                      <span className="font-medium">{leg.originName}</span>{" "}
-                      <span className="tabular-nums">{showTime(leg.depart)}</span>
-                      {index === 0 && showWait && !later && <span className="text-primary"> · {formatWait(wait)}</span>}
-                    </p>
-                    <p className="text-muted-foreground">prema {leg.headsign}</p>
-                    <p>
-                      <span className="font-medium">{leg.destinationName}</span>{" "}
-                      <span className="tabular-nums">{showTime(leg.arrive)}</span>
-                    </p>
-                    <Link href={`/linije/${leg.lineId}?stop=${leg.originStopId}`} className="mt-1 inline-block text-primary">
-                      Linija {leg.code}
-                    </Link>
-                  </div>
+                  <span className="truncate text-base font-medium">{leg.originName}</span>
+                  <Link
+                    href={`/linije/${leg.lineId}?stop=${leg.originStopId}&smjer=${leg.directionId}`}
+                    aria-label={`Raspored linije ${leg.code}, stajalište ${leg.originName}`}
+                    className="grid h-9 min-w-12 place-items-center justify-self-start rounded-full px-2.5 text-sm font-semibold text-white"
+                    style={{ background: leg.color }}
+                  >
+                    {leg.code}
+                  </Link>
+                  <span className="text-center font-display text-2xl leading-none text-muted-foreground" aria-hidden>
+                    ↓
+                  </span>
+                  <span className="text-base font-medium text-[oklch(0.62_0.16_45)]">~ {formatDuration(duration)}</span>
+                  <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Dolazak</span>
+                  <span className="grid h-12 min-w-[4.75rem] place-items-center rounded-full border-2 border-foreground px-3.5 font-display text-2xl leading-none">
+                    {showTime(leg.arrive)}
+                  </span>
+                  <span className="truncate text-base font-medium">{leg.destinationName}</span>
                 </div>
-              </li>
+                {index === 0 && showWait && !later && <p className="mt-1 text-sm text-primary">{formatWait(wait)}</p>}
+              </div>
             );
           })}
-        </ol>
+        </div>
         <Button className="mt-4 h-11 w-full" variant="outline" nativeButton={false} render={<Link href={`/karta?stop=${first.originStopId}&linija=${first.lineId}`} />}>
           <MapPinned className="size-4" />
           Otvori na karti
