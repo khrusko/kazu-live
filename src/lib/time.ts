@@ -13,6 +13,7 @@ export function zagrebParts(date = new Date()) {
       weekday: "short",
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
       day: "2-digit",
       month: "2-digit",
       hourCycle: "h23",
@@ -24,9 +25,11 @@ export function zagrebParts(date = new Date()) {
   const day: DayType = weekday === "Sat" ? "subota" : weekday === "Sun" ? "nedjelja" : "radni";
   const hour = Number(parts.hour);
   const minute = Number(parts.minute);
+  const second = Number(parts.second);
   return {
     day,
     minutes: hour * 60 + minute,
+    exact: hour * 60 + minute + second / 60,
     clock: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
     dateLabel: `${parts.day}.${parts.month}.`,
   };

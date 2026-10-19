@@ -71,6 +71,8 @@ export function departuresForStop(lines: Line[], stops: Stop[], stopId: string, 
         for (const index of indexes) {
           const time = trip.times[index];
           if (!time) continue;
+          const continues = trip.times.slice(index + 1).some((later) => Boolean(later));
+          if (!continues) continue;
           rows.push({
             lineId: line.id,
             code: line.code,

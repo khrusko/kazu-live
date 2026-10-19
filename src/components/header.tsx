@@ -109,7 +109,7 @@ export function Header() {
             ref={bellRef}
             type="button"
             className="relative grid size-11 place-items-center rounded-full hover:bg-white/10"
-            aria-label="Obavijesti za favorite"
+            aria-label="Obavijesti"
             aria-expanded={bell}
             onClick={() => {
               setOpen(false);
@@ -145,7 +145,7 @@ export function Header() {
             onClick={(event) => event.stopPropagation()}
           >
             <p className="px-1 text-xs text-muted-foreground">
-              Obavijesti za omiljene linije.
+              Obavijesti koje se odnose na vaše omiljene linije.
             </p>
             <div className="mt-2 max-h-72 space-y-2 overflow-auto">
               {(notices.length ? notices : network?.announcements ?? []).slice(0, 4).map((item) => (

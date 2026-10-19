@@ -250,7 +250,19 @@ export function planJourneys(
       (item.departMinutes === have.departMinutes && (item.arriveMinutes < have.arriveMinutes || (item.arriveMinutes === have.arriveMinutes && walk < haveWalk)));
     if (better) byRoute.set(key, item);
   }
-  return [...byRoute.values()]
-    .sort((a, b) => a.transfers - b.transfers || a.departMinutes - b.departMinutes || a.arriveMinutes - b.arriveMinutes)
-    .slice(0, 12);
+  const ranked = [...byRoute.values()].sort(
+    (a, b) => a.transfers - b.transfers || a.departMinutes - b.departMinutes || a.arriveMinutes - b.arriveMinutes,
+  );
+  // Drop a ride when another one leaves at the same time or later and still arrives
+  // well before it. A few minutes of difference can be another path; an hour cannot.
+  const useful = ranked.filter(
+    (item) =>
+      !ranked.some(
+        (other) =>
+          other !== item &&
+          other.departMinutes >= item.departMinutes &&
+          other.arriveMinutes + 45 <= item.arriveMinutes,
+      ),
+  );
+  return useful.slice(0, 4);
 }

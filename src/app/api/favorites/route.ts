@@ -9,7 +9,7 @@ function toggle(list: string[], id: string) {
 
 export async function POST(request: Request) {
   const session = await currentUser();
-  if (!session) return NextResponse.json({ error: "Prijavite se da bi favorit ostao na računu." }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Prijavite se da omiljena linija ostane spremljena na računu." }, { status: 401 });
   const body = (await request.json()) as { lineId?: string; stopId?: string };
   const user = await updateStore((store) => {
     const found = store.users.find((item) => item.id === session.id);

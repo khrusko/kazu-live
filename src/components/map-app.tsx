@@ -15,7 +15,7 @@ import { useKazu } from "@/components/providers";
 import { SALES_POINTS } from "@/lib/fares";
 import { departuresForStop, GROUP_LABEL, linesAtStop, liveBuses, stopOnShape } from "@/lib/schedule";
 import { DAY_LABEL, formatWait, showTime, zagrebParts } from "@/lib/time";
-import type { Line, Stop } from "@/lib/types";
+import type { DayType, Line, Stop } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
 
 type Point = { id: string; lat: number; lng: number; name: string };
@@ -29,22 +29,69 @@ function busIcon(code: string, color: string) {
   });
 }
 
-function liveBusIcon(code: string, color: string, heading: number) {
-  const nose = Number.isFinite(heading) ? Math.round(heading) : 0;
-  const label = code.replace(/[&<>"]/g, "");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-    <g transform="rotate(${nose} 24 24)">
-      <polygon points="24,3 33,17 15,17" fill="${color}" stroke="white" stroke-width="2" stroke-linejoin="round"/>
-    </g>
-    <rect x="4" y="16" width="40" height="20" rx="7" fill="${color}" stroke="white" stroke-width="2"/>
-    <text x="24" y="30" text-anchor="middle" fill="white" font-size="11" font-family="Arial,sans-serif" font-weight="700">${label}</text>
-  </svg>`;
+function busEmoji() {
   return L.divIcon({
     className: "bus-live-pin",
-    html: svg,
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
+    html: `<span class="bus-emoji" aria-hidden="true">🚌</span>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
   });
+}
+
+function MovingBuses({
+  lines,
+  stops,
+  day,
+  enabled,
+  onCount,
+}: {
+  lines: Line[];
+  stops: Stop[];
+  day: DayType;
+  enabled: boolean;
+  onCount: (count: number) => void;
+}) {
+  const icon = useMemo(() => busEmoji(), []);
+  const [exact, setExact] = useState(() => zagrebParts().exact);
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = window.setInterval(() => setExact(zagrebParts().exact), 250);
+    return () => window.clearInterval(timer);
+  }, [enabled]);
+  const buses = useMemo(
+    () => (enabled ? liveBuses(lines, stops, day, exact) : []),
+    [enabled, lines, stops, day, exact],
+  );
+  useEffect(() => {
+    onCount(buses.length);
+  }, [buses.length, onCount]);
+  if (!enabled) return null;
+  return (
+    <>
+      {buses.map((bus) => (
+        <Marker key={bus.id} position={[bus.lat, bus.lng]} icon={icon} zIndexOffset={700}>
+          <Tooltip>
+            {bus.code} prema {bus.headsign}
+            <br />
+            {bus.from} {showTime(bus.fromTime)} → {bus.to} {showTime(bus.toTime)}
+          </Tooltip>
+          <Popup>
+            <div className="text-sm text-foreground">
+              <p className="font-semibold">
+                {bus.code} prema {bus.headsign}
+              </p>
+              <p className="mt-1">
+                {bus.from} · {showTime(bus.fromTime)}
+              </p>
+              <p>
+                {bus.to} · {showTime(bus.toTime)}
+              </p>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
 }
 
 function officeIcon() {
@@ -108,10 +155,7 @@ export function MapApp() {
   const passed = departures.filter((item) => item.minutes < now.minutes);
   const serving = selectedStop ? linesAtStop(lines, selectedStop.id) : [];
 
-  const buses = useMemo(
-    () => (showBuses ? liveBuses(selectedLine ? [selectedLine] : lines, stops, now.day, now.minutes) : []),
-    [showBuses, selectedLine, lines, stops, now.day, now.minutes],
-  );
+  const [busCount, setBusCount] = useState(0);
 
   function setQueryParams(next: { stop?: string | null; linija?: string | null }) {
     const search = new URLSearchParams(params.toString());
@@ -261,28 +305,13 @@ export function MapApp() {
               </div>
             </Popup>
           )}
-          {buses.map((bus) => (
-            <Marker key={bus.id} position={[bus.lat, bus.lng]} icon={liveBusIcon(bus.code, bus.color, bus.heading)} zIndexOffset={700}>
-              <Tooltip>
-                {bus.code} prema {bus.headsign}
-                <br />
-                {bus.from} {showTime(bus.fromTime)} → {bus.to} {showTime(bus.toTime)}
-              </Tooltip>
-              <Popup>
-                <div className="text-sm text-foreground">
-                  <p className="font-semibold">
-                    {bus.code} prema {bus.headsign}
-                  </p>
-                  <p className="mt-1">
-                    {bus.from} · {showTime(bus.fromTime)}
-                  </p>
-                  <p>
-                    {bus.to} · {showTime(bus.toTime)}
-                  </p>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          <MovingBuses
+            lines={selectedLine ? [selectedLine] : lines}
+            stops={stops}
+            day={now.day}
+            enabled={showBuses}
+            onCount={setBusCount}
+          />
           <FlyTo lat={selectedStop?.lat ?? selectedOffice?.lat ?? null} lng={selectedStop?.lng ?? selectedOffice?.lng ?? null} />
           {selectedLine && !selectedStop && <FitLine lineId={selectedLine.id} points={linePoints} />}
         </MapContainer>
@@ -348,7 +377,7 @@ export function MapApp() {
             </span>
             <button type="button" className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1" onClick={() => setShowBuses((value) => !value)}>
               <LocateFixed className="size-3" />
-              {showBuses ? `${buses.length} u vožnji` : "Autobusi skriveni"}
+              {showBuses ? `${busCount} u vožnji` : "Autobusi skriveni"}
             </button>
           </div>
         </div>
@@ -380,14 +409,12 @@ export function MapApp() {
           )}
         </div>
         <p className="border-t px-4 py-2 text-[11px] leading-snug text-muted-foreground">
-          Stajališta u Karlovcu preuzeta su s GIS-a Grada Karlovca. Ostala su postavljena uz cestu službene linije.
+          Stajališta prate službene linije.
         </p>
       </aside>
     </div>
   );
 }
-
-const BADGE_LIMIT = 8;
 
 function clipSegment(bounds: L.LatLngBounds, a: [number, number], b: [number, number]): [number, number] | null {
   const west = bounds.getWest();
@@ -449,12 +476,6 @@ function LineBadges({ lines }: { lines: Line[] }) {
     for (const line of current) {
       const candidates = lineHits(line, bounds);
       if (candidates.length) visible.push({ line, candidates });
-    }
-    // One chip per line, and only while a handful of lines actually cross the view.
-    // A chosen line always keeps its chip, even if the county is otherwise busy.
-    if (current.length !== 1 && visible.length > BADGE_LIMIT) {
-      setBadges((prev) => (prev.length === 0 ? prev : []));
-      return;
     }
     const placed: L.Point[] = [];
     const next: { id: string; code: string; color: string; lat: number; lng: number }[] = [];

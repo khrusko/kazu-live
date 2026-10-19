@@ -17,24 +17,9 @@ export default function AdminHome() {
     );
   }
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8">
-      <p className="text-sm text-muted-foreground">Administracija</p>
-      <h1 className="font-display text-4xl">Izmjena reda ide odmah na kartu</h1>
-      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Spremljeni polazak putnici vide u roku od nekoliko sekundi, bez novog PDF-a. Uz izmjenu možete objaviti obavijest za omiljene linije.
-      </p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link href="/admin/karta" className="rounded-full bg-primary px-3 py-1.5 text-sm text-primary-foreground">
-          Stajališta i ceste
-        </Link>
-        <Link href="/admin/prijedlozi" className="rounded-full bg-muted px-3 py-1.5 text-sm">
-          Prijedlozi lokacija
-        </Link>
-        <Link href="/admin/obavijesti" className="rounded-full bg-muted px-3 py-1.5 text-sm">
-          Nova obavijest
-        </Link>
-      </div>
-      <div className="mt-8 space-y-6">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6">
+      <h1 className="font-display text-3xl">Vozni red</h1>
+      <div className="mt-4 space-y-6">
         {["A", "B", "C", "D", "E"].map((group) => (
           <section key={group}>
             <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{GROUP_LABEL[group]}</h2>
