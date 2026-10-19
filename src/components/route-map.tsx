@@ -67,22 +67,41 @@ function Fit({ positions, signature }: { positions: [number, number][]; signatur
   return null;
 }
 
+function FocusPoint({ center, zoom, signature }: { center: [number, number]; zoom: number; signature: string }) {
+  const map = useMap();
+  useEffect(() => {
+    const apply = () => {
+      map.invalidateSize();
+      map.setView(center, zoom);
+    };
+    apply();
+    const timer = window.setTimeout(apply, 250);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, signature]);
+  return null;
+}
+
 export function RouteMap({
   routes,
   active,
   onSelect,
   className,
   scrollWheel = false,
+  focus,
+  focusZoom = 12,
 }: {
   routes: RouteDraw[];
   active: number;
   onSelect?: (index: number) => void;
   className?: string;
   scrollWheel?: boolean;
+  focus?: [number, number];
+  focusZoom?: number;
 }) {
   const [satellite, setSatellite] = useState(false);
   const positions = routes.flatMap((route) => route.parts.flatMap((part) => part.positions));
-  const center = positions[0] ?? [45.49, 15.55];
+  const center = positions[0] ?? focus ?? [45.49, 15.55];
   const signature = routes
     .map((route) => route.parts.map((part) => `${part.code ?? ""}:${part.positions.length}:${part.positions[0]?.join(",") ?? ""}`).join("|"))
     .join(";");
@@ -163,7 +182,11 @@ export function RouteMap({
             <Tooltip>{pin.label}</Tooltip>
           </CircleMarker>
         ))}
-        <Fit positions={positions} signature={signature} />
+        {positions.length >= 2 ? (
+          <Fit positions={positions} signature={signature} />
+        ) : (
+          <FocusPoint center={focus ?? [45.49, 15.55]} zoom={focus ? focusZoom : 11} signature={`${focus?.[0] ?? ""},${focus?.[1] ?? ""},${focusZoom}`} />
+        )}
       </MapContainer>
       <BasemapSwitch satellite={satellite} onChange={setSatellite} />
     </div>

@@ -24,7 +24,7 @@ function formatDuration(minutes: number) {
 
 const RouteMap = dynamic(() => import("@/components/route-map").then((mod) => mod.RouteMap), {
   ssr: false,
-  loading: () => <div className="grid h-56 place-items-center text-sm text-muted-foreground sm:h-72">Učitavam kartu rute…</div>,
+  loading: () => <div className="grid h-full min-h-56 place-items-center text-sm text-muted-foreground">Učitavam kartu rute…</div>,
 });
 
 export function TripHome() {
@@ -158,7 +158,7 @@ export function TripHome() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:grid lg:h-full lg:max-w-none lg:grid-cols-[minmax(22rem,28rem)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden lg:px-0 lg:pt-0 lg:pb-0">
+    <main className="mx-auto w-full max-w-lg px-4 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:grid lg:h-full lg:max-w-none lg:grid-cols-[minmax(18rem,1fr)_minmax(0,2fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden lg:px-0 lg:pt-0 lg:pb-0">
       <div className="lg:h-full lg:overflow-y-auto lg:px-4 lg:pt-4 lg:pb-6">
       <p className="text-xs tracking-wide text-muted-foreground uppercase">{now.dateLabel} · {now.clock} · {DAY_LABEL[now.day]}</p>
       <h1 className="font-display mt-1 text-4xl leading-none">Kamo putujete?</h1>
@@ -349,6 +349,7 @@ export function TripHome() {
               active={chosenRoute}
               onSelect={setActiveRoute}
               showMap={!wide}
+              showChoices={!wide}
               later={planned.later}
               laterNote={
                 planned.later
@@ -370,21 +371,24 @@ export function TripHome() {
         </>
       )}
       </div>
-      <div className="relative hidden bg-[#e7eee8] lg:block lg:h-full lg:min-h-0">
-        {wide && destination && hasRouteMap ? (
-          <div className="absolute inset-0">
-            <RouteMap
-              routes={drawn}
-              active={chosenRoute}
-              onSelect={drawn.length > 1 ? setActiveRoute : undefined}
-              scrollWheel
-              className="h-full"
-            />
+      <div className="hidden h-full min-h-0 flex-col bg-[#e7eee8] lg:flex">
+        <div className="flex min-h-0 flex-1 items-center justify-center p-4 pb-2" style={{ containerType: "size" }}>
+          <div className="aspect-square w-[min(100cqw,100cqh)] overflow-hidden rounded-[1.75rem] bg-[#d5e0d8] shadow-sm ring-1 ring-foreground/10">
+            {wide && (
+              <RouteMap
+                routes={hasRouteMap ? drawn : []}
+                active={chosenRoute}
+                onSelect={drawn.length > 1 ? setActiveRoute : undefined}
+                scrollWheel
+                className="h-full"
+                focus={origin ? [origin.lat, origin.lng] : [45.49, 15.55]}
+                focusZoom={origin ? 13 : 11}
+              />
+            )}
           </div>
-        ) : (
-          <div className="grid h-full place-items-center px-10 text-center text-sm text-muted-foreground">
-            Karta rute pojavljuje se nakon odabira odredišta.
-          </div>
+        </div>
+        {destination && planned.items.length > 0 && (
+          <RouteChoices items={planned.items} active={chosenRoute} onSelect={setActiveRoute} showWait={showWait} later={planned.later} nowMinutes={now.minutes} />
         )}
       </div>
     </main>
@@ -409,11 +413,70 @@ function drawPlan(plan: Itinerary | undefined, lines: Line[]) {
   return { parts, pins: uniquePins };
 }
 
+function RouteChoices({
+  items,
+  active,
+  onSelect,
+  showWait,
+  later,
+  nowMinutes,
+}: {
+  items: Itinerary[];
+  active: number;
+  onSelect: (index: number) => void;
+  showWait: boolean;
+  later: boolean;
+  nowMinutes: number;
+}) {
+  return (
+    <div className="shrink-0 px-4 pt-1 pb-4">
+      {items.length > 1 && <p className="mb-2 text-xs text-muted-foreground">Odaberi rutu</p>}
+      <ul className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(items.length, 4)}, minmax(0, 1fr))` }}>
+        {items.map((item, index) => {
+          const start = item.legs[0];
+          const end = item.legs[item.legs.length - 1];
+          const chosen = index === Math.min(active, items.length - 1);
+          const duration = formatDuration(item.arriveMinutes - item.departMinutes);
+          const body = (
+            <>
+              <span className="flex items-baseline justify-between gap-2">
+                <span className="font-display text-xl leading-none">{index + 1}.</span>
+                <span className="text-sm font-medium">{duration}</span>
+              </span>
+              <span className="mt-1 block truncate text-sm">{item.legs.map((leg) => leg.code).join(" → ")}</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {showTime(start.depart)}–{showTime(end.arrive)}
+                {showWait && !later ? ` · ${formatWait(start.departMinutes - nowMinutes)}` : ""}
+              </span>
+            </>
+          );
+          return (
+            <li key={`${item.legs.map((leg) => leg.lineId).join("-")}-${start.depart}`}>
+              {items.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => onSelect(index)}
+                  className={`w-full rounded-2xl px-3 py-2.5 text-left ${chosen ? "bg-card ring-2 ring-foreground" : "bg-card/80 ring-1 ring-foreground/10"}`}
+                >
+                  {body}
+                </button>
+              ) : (
+                <div className="rounded-2xl bg-card px-3 py-2.5 ring-1 ring-foreground/10">{body}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function PlanResult({
   items,
   active,
   onSelect,
   showMap,
+  showChoices = true,
   later,
   laterNote,
   hint,
@@ -425,6 +488,7 @@ function PlanResult({
   active: number;
   onSelect: (index: number) => void;
   showMap: boolean;
+  showChoices?: boolean;
   later: boolean;
   laterNote: string | null;
   hint: string;
@@ -447,7 +511,7 @@ function PlanResult({
     <section className="mt-3 overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/10">
       <div className="p-4">
         {laterNote && <p className="mb-2 text-sm text-muted-foreground">{laterNote}</p>}
-        {items.length > 1 && (
+        {showChoices && items.length > 1 && (
           <>
         <p className="text-xs text-muted-foreground">{hint}</p>
         <ul className="mt-2 space-y-2">
