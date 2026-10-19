@@ -23,6 +23,12 @@ function nodeIcon(kind: "stop" | "node" | "selected") {
   });
 }
 
+function neighborSpan(points: LatLng[], anchor: number) {
+  if (anchor <= 0) return { from: 0, to: Math.min(1, Math.max(points.length - 1, 0)) };
+  if (anchor >= points.length - 1) return { from: Math.max(0, points.length - 2), to: points.length - 1 };
+  return { from: anchor - 1, to: anchor + 1 };
+}
+
 function shapeOf(direction: Direction): { points: LatLng[]; anchors: number[] } {
   const points = (direction.shape?.length ? direction.shape : direction.geometry).map((point) => [point[0], point[1]] as LatLng);
   const anchors =
@@ -48,6 +54,19 @@ function closestSegment(points: LatLng[], lat: number, lng: number) {
     }
   }
   return best;
+}
+
+function ShowSavedSpan({ points, span }: { points: LatLng[]; span: { from: number; to: number } | null }) {
+  const map = useMap();
+  const key = span ? `${span.from}:${span.to}:${points.length}` : "";
+  useEffect(() => {
+    if (!span || span.to <= span.from) return;
+    const slice = points.slice(span.from, span.to + 1);
+    if (slice.length >= 2) map.fitBounds(slice, { padding: [36, 36], maxZoom: 15 });
+    // Show the saved stretch once, not on later pans.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, map]);
+  return null;
 }
 
 function FitShape({ points, id }: { points: LatLng[]; id: string }) {
@@ -141,7 +160,9 @@ export function AdminRoadEditor() {
   const [dirty, setDirty] = useState(false);
   const [satellite, setSatellite] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [savedSpan, setSavedSpan] = useState<{ from: number; to: number } | null>(null);
   const skip = useRef(false);
+  const saving = useRef(false);
 
   const line = network?.lines.find((item) => item.id === lineId) ?? network?.lines[0] ?? null;
   const direction = line?.directions.find((item) => item.id === directionId) ?? line?.directions[0] ?? null;
@@ -154,6 +175,7 @@ export function AdminRoadEditor() {
     setDraftAnchors(next.anchors);
     setSelected(null);
     setDirty(false);
+    setSavedSpan(null);
     // Reload the line only when the direction changes. A stop save must not wipe unsaved vertices.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDirectionId]);
@@ -174,10 +196,26 @@ export function AdminRoadEditor() {
 
   const anchorSet = new Set(draftAnchors);
   const selectedIsStop = selected != null && anchorSet.has(selected);
+  const selectedStopIndex = selectedIsStop && selected != null ? draftAnchors.indexOf(selected) : -1;
   const selectedStop =
-    selectedIsStop && selected != null
-      ? network?.stops.find((stop) => stop.id === direction.stops[draftAnchors.indexOf(selected)]?.stopId)
-      : null;
+    selectedStopIndex >= 0 ? network?.stops.find((stop) => stop.id === direction.stops[selectedStopIndex]?.stopId) : null;
+  const stopTitle = (stopId: string | undefined) => network?.stops.find((stop) => stop.id === stopId)?.name ?? stopId ?? "";
+  const routeLabel =
+    selectedStopIndex >= 0
+      ? [
+          selectedStopIndex > 0 ? stopTitle(direction.stops[selectedStopIndex - 1]?.stopId) : null,
+          selectedStop?.name ?? stopTitle(direction.stops[selectedStopIndex]?.stopId),
+          selectedStopIndex < direction.stops.length - 1 ? stopTitle(direction.stops[selectedStopIndex + 1]?.stopId) : null,
+        ]
+          .filter((name): name is string => Boolean(name))
+          .join(" → ")
+      : "";
+  const span =
+    savedSpan && savedSpan.to > savedSpan.from && savedSpan.from >= 0 && savedSpan.to < draftShape.length
+      ? savedSpan
+      : selectedIsStop && selected != null
+        ? neighborSpan(draftShape, selected)
+        : null;
 
   function chooseLine(id: string) {
     setLineId(id);
@@ -195,6 +233,7 @@ export function AdminRoadEditor() {
     setDraftAnchors(next.anchors);
     setSelected(null);
     setDirty(false);
+    setSavedSpan(null);
   }
 
   function insertNear(lat: number, lng: number) {
@@ -210,6 +249,7 @@ export function AdminRoadEditor() {
     });
     if (nearestD < 4e-8) {
       setSelected(nearest);
+      setSavedSpan(null);
       return;
     }
     const at = closestSegment(draftShape, lat, lng);
@@ -217,6 +257,7 @@ export function AdminRoadEditor() {
     setDraftAnchors((anchors) => anchors.map((anchor) => (anchor > at ? anchor + 1 : anchor)));
     setSelected(at + 1);
     setDirty(true);
+    setSavedSpan(null);
   }
 
   function removeSelected() {
@@ -226,37 +267,67 @@ export function AdminRoadEditor() {
     setDraftAnchors((anchors) => anchors.map((anchor) => (anchor > index ? anchor - 1 : anchor)));
     setSelected(null);
     setDirty(true);
+    setSavedSpan(null);
   }
 
-  async function saveStop(id: string, lat: number, lng: number) {
+  async function saveMovedStop(stopId: string, lat: number, lng: number, points: LatLng[], anchors: number[], vertexIndex: number, previous: LatLng[]) {
+    if (!direction || saving.current) return;
+    const stopIndex = anchors.indexOf(vertexIndex);
+    if (stopIndex < 0) return;
+    const nameOf = (id: string | undefined) => network?.stops.find((stop) => stop.id === id)?.name ?? null;
+    const label = [stopIndex > 0 ? nameOf(direction.stops[stopIndex - 1]?.stopId) : null, nameOf(stopId) ?? "Stajalište", stopIndex < direction.stops.length - 1 ? nameOf(direction.stops[stopIndex + 1]?.stopId) : null]
+      .filter((name): name is string => Boolean(name))
+      .join(" → ");
+    saving.current = true;
     setBusy(true);
     try {
-      const response = await fetch("/api/admin/stops", {
+      const response = await fetch("/api/admin/stop-road", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id, lat, lng }),
+        body: JSON.stringify({
+          id: stopId,
+          lat,
+          lng,
+          draft: { directionId: direction.id, points, anchors, stopIndex },
+        }),
       });
-      const data = await response.json();
+      const data = (await response.json()) as {
+        error?: string;
+        directions?: { id: string; shape: LatLng[]; shapeAnchors: number[]; routed: boolean; focus: { from: number; to: number } | null }[];
+      };
       if (!response.ok) throw new Error(data.error || "Spremanje nije uspjelo.");
-      toast.success("Stajalište je na novom mjestu.");
-      await refresh();
+      const saved = data.directions?.find((item) => item.id === direction.id);
+      if (!saved?.shape || !saved.shapeAnchors) throw new Error("Cesta nije spremljena.");
+      setDraftShape(saved.shape.map((point) => [point[0], point[1]]));
+      setDraftAnchors(saved.shapeAnchors.slice());
+      setSelected(saved.shapeAnchors[stopIndex] ?? null);
+      setSavedSpan(saved.focus);
+      setDirty(false);
+      toast.success(saved.routed ? `Spremljeno. Nova ruta: ${label}.` : "Stajalište je spremljeno. Cesta nije dohvaćena, čvor je i dalje spojen sa susjedima.");
     } catch (error) {
+      setDraftShape(previous.map((point) => [point[0], point[1]]));
       toast.error(error instanceof Error ? error.message : "Spremanje nije uspjelo.");
+      return;
     } finally {
+      saving.current = false;
       setBusy(false);
     }
+    await refresh().catch(() => undefined);
   }
 
   function moveVertex(index: number, lat: number, lng: number) {
     const point: LatLng = [lat, lng];
     if (anchorSet.has(index)) {
+      if (saving.current) return;
+      const next = draftShape.map((item, itemIndex) => (itemIndex === index ? point : item));
       const stopIndex = draftAnchors.indexOf(index);
       const stopId = direction?.stops[stopIndex]?.stopId;
-      setDraftShape((points) => points.map((item, itemIndex) => (itemIndex === index ? point : item)));
-      if (stopId) void saveStop(stopId, lat, lng);
+      setDraftShape(next);
+      if (stopId) void saveMovedStop(stopId, lat, lng, next, draftAnchors, index, draftShape);
       return;
     }
     setDraftShape((points) => points.map((item, itemIndex) => (itemIndex === index ? point : item)));
+    setSavedSpan(null);
     setDirty(true);
   }
 
@@ -274,6 +345,7 @@ export function AdminRoadEditor() {
       setDraftShape(data.shape);
       setDraftAnchors(data.shapeAnchors);
       setDirty(false);
+      setSavedSpan(null);
       toast.success("Cesta je spremljena.");
       await refresh();
     } catch (error) {
@@ -315,6 +387,7 @@ export function AdminRoadEditor() {
       );
       setSelected(from + (routed.waypointIndexes[1] ?? 1));
       setDirty(true);
+      setSavedSpan(null);
       toast.success("Čvor je povučen na cestu. Spremi ako tako treba ostati.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Cesta nije dohvaćena.");
@@ -339,6 +412,7 @@ export function AdminRoadEditor() {
       setDraftAnchors(routed.waypointIndexes);
       setSelected(null);
       setDirty(true);
+      setSavedSpan(null);
       toast.success("Smjer je povučen na cestu. Spremi ako tako treba ostati.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Cesta nije dohvaćena.");
@@ -356,13 +430,28 @@ export function AdminRoadEditor() {
           </Link>
           <h1 className="font-display text-2xl">Stajališta i ceste</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Povuci stajalište ili bilo koji čvor. Klik na liniju dodaje čvor, a odabrani čvor koji nije stajalište možeš obrisati. Približi kartu da vidiš sve čvorove. Povuci na cestu slaže liniju uz prometnicu.
+            Zelena točka je stajalište i spaja prethodni čvor sa sljedećim. Povuci je: cesta između tih čvorova odmah ide preko novog mjesta i sprema se. Crni čvor složi ručno i spremi ga gumbom Spremi cestu. Klik na liniju dodaje čvor.
           </p>
+          <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <li className="flex items-center gap-2">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#0f766e]" />
+              Stajalište, spoj prethodnog i sljedećeg čvora
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#1c1915]" />
+              Čvor ceste, sprema se gumbom
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="inline-block h-1.5 w-6 rounded-full bg-[#b45309]" />
+              Ruta između susjednih čvorova
+            </li>
+          </ul>
           <label className="mt-3 block text-xs text-muted-foreground">
             Linija
             <select
               className="mt-1 h-9 w-full rounded-lg border bg-background px-2 text-sm text-foreground"
               value={line.id}
+              disabled={busy}
               onChange={(event) => chooseLine(event.target.value)}
             >
               {network?.lines.map((item) => (
@@ -377,6 +466,7 @@ export function AdminRoadEditor() {
             <select
               className="mt-1 h-9 w-full rounded-lg border bg-background px-2 text-sm text-foreground"
               value={direction.id}
+              disabled={busy}
               onChange={(event) => chooseDirection(event.target.value)}
             >
               {line.directions.map((item) => (
@@ -387,7 +477,7 @@ export function AdminRoadEditor() {
             </select>
           </label>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className="rounded-full bg-primary px-3 py-1.5 text-xs text-primary-foreground" disabled={busy || !dirty} onClick={saveRoad}>
+            <button type="button" className="rounded-full bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-40" disabled={busy || !dirty} onClick={saveRoad}>
               Spremi cestu
             </button>
             <button type="button" className="rounded-full bg-muted px-3 py-1.5 text-xs" disabled={busy || selected == null} onClick={pullNode}>
@@ -405,7 +495,14 @@ export function AdminRoadEditor() {
           {selected != null && (
             <div className="mt-3 rounded-xl bg-muted p-2 text-sm">
               <p>{selectedIsStop ? `Stajalište: ${selectedStop?.name ?? "čvor"}` : `Čvor ${selected + 1} od ${draftShape.length}`}</p>
-              <p className="text-xs text-muted-foreground">Povuci ga po karti. {selectedIsStop ? "Mjesto stajališta se sprema odmah." : "Cestu spremi gumbom iznad."}</p>
+              {selectedIsStop && routeLabel && <p className="mt-1 text-xs">Spoj: {routeLabel}</p>}
+              <p className="text-xs text-muted-foreground">
+                {selectedIsStop
+                  ? savedSpan
+                    ? "Nova ruta je narančasta i već je spremljena."
+                    : "Povuci stajalište. Nova ruta između susjednih čvorova postane narančasta i odmah se spremi."
+                  : "Povuci ga po karti. Cestu spremi gumbom iznad."}
+              </p>
               {!selectedIsStop && (
                 <button type="button" className="mt-2 rounded-full bg-background px-3 py-1.5 text-xs" disabled={busy} onClick={removeSelected}>
                   Obriši čvor
@@ -424,6 +521,7 @@ export function AdminRoadEditor() {
                   type="button"
                   className={`flex w-full items-baseline gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted ${selected === anchor ? "bg-muted" : ""}`}
                   onClick={() => {
+                    if (anchor !== selected) setSavedSpan(null);
                     setSelected(anchor ?? null);
                     const point = draftShape[anchor];
                     if (point) skip.current = true;
@@ -441,6 +539,7 @@ export function AdminRoadEditor() {
         <MapContainer center={[45.4, 15.55]} zoom={10} className="h-full w-full" scrollWheelZoom fadeAnimation={false}>
           <Basemap satellite={satellite} />
           <FitShape points={draftShape} id={direction.id} />
+          <ShowSavedSpan points={draftShape} span={savedSpan} />
           <Polyline
             positions={draftShape}
             pathOptions={{ color: line.color, weight: 5, opacity: 0.9 }}
@@ -454,6 +553,9 @@ export function AdminRoadEditor() {
               },
             }}
           />
+          {span && span.to > span.from && (
+            <Polyline positions={draftShape.slice(span.from, span.to + 1)} pathOptions={{ color: "#b45309", weight: 8, opacity: 0.95, interactive: false }} />
+          )}
           <Vertices
             points={draftShape}
             anchors={draftAnchors}
@@ -461,6 +563,7 @@ export function AdminRoadEditor() {
             busy={busy}
             onSelect={(index) => {
               skip.current = true;
+              if (index !== selected) setSavedSpan(null);
               setSelected(index);
             }}
             onMove={moveVertex}

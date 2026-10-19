@@ -240,7 +240,7 @@ function ensureShape(direction: Direction, roads: Record<string, RoadShape>, sto
   direction.shapeAnchors = direction.geometry.map((_, index) => index);
 }
 
-/** Move a stop and the road vertex it sits on, on every line that serves it. */
+/** Move a stop and the road vertex it sits on, on every line that serves it. The editor then redraws the stretch between the neighbouring vertices. */
 export function placeStop(store: Store, stopId: string, lat: number, lng: number, precision: string) {
   const stop = store.stops.find((item) => item.id === stopId);
   if (!stop) throw new Error("Stajalište ne postoji.");
