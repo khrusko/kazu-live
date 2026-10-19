@@ -15,7 +15,7 @@ const TABS = [
     href: "/admin/karta",
     label: "Stajališta i ceste",
     match: (path: string) => path.startsWith("/admin/karta"),
-    text: "Povuci stajalište ili čvor i složi liniju uz cestu.",
+    text: "Povlačenje stajališta odmah sprema cestu do susjednih čvorova. Običan čvor složi, pa spremi cestu.",
   },
   {
     href: "/admin/prijedlozi",
