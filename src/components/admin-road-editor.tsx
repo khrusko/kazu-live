@@ -280,6 +280,7 @@ export function AdminRoadEditor() {
       .join(" → ");
     saving.current = true;
     setBusy(true);
+    let savedOk = false;
     try {
       const response = await fetch("/api/admin/stop-road", {
         method: "PUT",
@@ -303,16 +304,15 @@ export function AdminRoadEditor() {
       setSelected(saved.shapeAnchors[stopIndex] ?? null);
       setSavedSpan(saved.focus);
       setDirty(false);
+      savedOk = true;
       toast.success(saved.routed ? `Spremljeno. Nova ruta: ${label}.` : "Stajalište je spremljeno. Cesta nije dohvaćena, čvor je i dalje spojen sa susjedima.");
     } catch (error) {
       setDraftShape(previous.map((point) => [point[0], point[1]]));
       toast.error(error instanceof Error ? error.message : "Spremanje nije uspjelo.");
-      return;
-    } finally {
-      saving.current = false;
-      setBusy(false);
     }
-    await refresh().catch(() => undefined);
+    if (savedOk) await refresh().catch(() => undefined);
+    saving.current = false;
+    setBusy(false);
   }
 
   function moveVertex(index: number, lat: number, lng: number) {
