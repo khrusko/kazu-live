@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CircleMarker, MapContainer, Marker, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { ChevronDown, Heart, LocateFixed, Search } from "lucide-react";
 import { Basemap, BasemapSwitch } from "@/components/basemap";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useKazu } from "@/components/providers";
-import { SALES_POINTS, type SalesPoint } from "@/lib/fares";
+import { SALES_POINTS } from "@/lib/fares";
 import { departuresForStop, GROUP_LABEL, linesAtStop, liveBuses, stopOnShape } from "@/lib/schedule";
 import { DAY_LABEL, formatWait, showTime, zagrebParts } from "@/lib/time";
 import type { Line, Stop } from "@/lib/types";
@@ -26,6 +26,24 @@ function busIcon(code: string, color: string) {
     html: `<span style="background:${color}">${code}</span>`,
     iconSize: [44, 22],
     iconAnchor: [22, 11],
+  });
+}
+
+function liveBusIcon(code: string, color: string, heading: number) {
+  const nose = Number.isFinite(heading) ? Math.round(heading) : 0;
+  const label = code.replace(/[&<>"]/g, "");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+    <g transform="rotate(${nose} 24 24)">
+      <polygon points="24,3 33,17 15,17" fill="${color}" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+    </g>
+    <rect x="4" y="16" width="40" height="20" rx="7" fill="${color}" stroke="white" stroke-width="2"/>
+    <text x="24" y="30" text-anchor="middle" fill="white" font-size="11" font-family="Arial,sans-serif" font-weight="700">${label}</text>
+  </svg>`;
+  return L.divIcon({
+    className: "bus-live-pin",
+    html: svg,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
   });
 }
 
@@ -66,6 +84,7 @@ export function MapApp() {
   const [now, setNow] = useState(() => zagrebParts());
   const [showBuses, setShowBuses] = useState(true);
   const [satellite, setSatellite] = useState(false);
+  const officeLock = useRef<string | null>(null);
   const lineId = params.get("linija");
   const stopId = params.get("stop");
   const officeId = params.get("blagajna");
@@ -108,6 +127,7 @@ export function MapApp() {
   }
 
   function openOffice(id: string | null) {
+    officeLock.current = id;
     const search = new URLSearchParams(params.toString());
     if (id) {
       search.set("blagajna", id);
@@ -220,19 +240,48 @@ export function MapApp() {
               <Tooltip>{point.place}</Tooltip>
             </Marker>
           ))}
-          {buses.map((bus) => (
-            <CircleMarker
-              key={bus.id}
-              center={[bus.lat, bus.lng]}
-              radius={6}
-              pathOptions={{ color: "#ffffff", weight: 2, fillColor: bus.color, fillOpacity: 1 }}
+          {selectedOffice && (
+            <Popup
+              position={[selectedOffice.lat, selectedOffice.lng]}
+              offset={[0, -8]}
+              eventHandlers={{
+                remove: () => {
+                  if (officeLock.current === selectedOffice.id) openOffice(null);
+                },
+              }}
             >
+              <div className="max-w-[240px] pr-4 text-sm text-foreground">
+                <p className="text-xs text-muted-foreground">Blagajna</p>
+                <p className="font-semibold">{selectedOffice.place}</p>
+                <p className="mt-1">{selectedOffice.address}</p>
+                <p className="mt-1 text-muted-foreground">{selectedOffice.hours}</p>
+                <button type="button" className="mt-2 text-xs text-primary" onClick={() => openOffice(null)}>
+                  Zatvori
+                </button>
+              </div>
+            </Popup>
+          )}
+          {buses.map((bus) => (
+            <Marker key={bus.id} position={[bus.lat, bus.lng]} icon={liveBusIcon(bus.code, bus.color, bus.heading)} zIndexOffset={700}>
               <Tooltip>
                 {bus.code} prema {bus.headsign}
                 <br />
-                {bus.from} → {bus.to}
+                {bus.from} {showTime(bus.fromTime)} → {bus.to} {showTime(bus.toTime)}
               </Tooltip>
-            </CircleMarker>
+              <Popup>
+                <div className="text-sm text-foreground">
+                  <p className="font-semibold">
+                    {bus.code} prema {bus.headsign}
+                  </p>
+                  <p className="mt-1">
+                    {bus.from} · {showTime(bus.fromTime)}
+                  </p>
+                  <p>
+                    {bus.to} · {showTime(bus.toTime)}
+                  </p>
+                </div>
+              </Popup>
+            </Marker>
           ))}
           <FlyTo lat={selectedStop?.lat ?? selectedOffice?.lat ?? null} lng={selectedStop?.lng ?? selectedOffice?.lng ?? null} />
           {selectedLine && !selectedStop && <FitLine lineId={selectedLine.id} points={linePoints} />}
@@ -318,12 +367,11 @@ export function MapApp() {
               onHeart={() => onHeart("stop", selectedStop.id)}
               onHeartLine={(id) => onHeart("line", id)}
             />
-          ) : selectedOffice ? (
-            <OfficeDetail office={selectedOffice} onClose={() => openOffice(null)} />
           ) : (
             <LineList
               lines={lines}
               activeId={lineId}
+              activeOffice={officeId}
               favorites={favoriteLineIds}
               onPick={(id) => setQueryParams({ linija: id === lineId ? null : id, stop: null })}
               onHeart={(id) => onHeart("line", id)}
@@ -453,6 +501,7 @@ function LineBadges({ lines }: { lines: Line[] }) {
 function LineList({
   lines,
   activeId,
+  activeOffice,
   favorites,
   onPick,
   onHeart,
@@ -460,6 +509,7 @@ function LineList({
 }: {
   lines: Line[];
   activeId: string | null;
+  activeOffice: string | null;
   favorites: string[];
   onPick: (id: string) => void;
   onHeart: (id: string) => void;
@@ -467,6 +517,7 @@ function LineList({
 }) {
   const groups = ["A", "B", "C", "D", "E"];
   const [closed, setClosed] = useState<Record<string, boolean>>({});
+  const [officesOpen, setOfficesOpen] = useState(true);
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -520,40 +571,35 @@ function LineList({
         );
       })}
       <section>
-        <h2 className="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Blagajne</h2>
-        <ul className="space-y-1">
-          {SALES_POINTS.map((point) => (
-            <li key={point.id}>
-              <button type="button" className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left hover:bg-muted" onClick={() => onOffice(point.id)}>
-                <span className="office-chip shrink-0">Blagajna</span>
-                <span className="min-w-0">
-                  <span className="block text-sm">{point.place}</span>
-                  <span className="block text-xs text-muted-foreground">{point.hours}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
-  );
-}
-
-function OfficeDetail({ office, onClose }: { office: SalesPoint; onClose: () => void }) {
-  return (
-    <div>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-xs text-muted-foreground">Blagajna</p>
-          <h1 className="font-display text-2xl leading-tight">{office.place}</h1>
-        </div>
-        <button type="button" onClick={onClose} className="rounded-full bg-muted px-2 py-1 text-xs">
-          Zatvori
+        <button
+          type="button"
+          className="mb-1 flex w-full items-center justify-between gap-2 text-left text-xs font-medium tracking-wide text-muted-foreground uppercase"
+          aria-expanded={officesOpen}
+          onClick={() => setOfficesOpen((value) => !value)}
+        >
+          Blagajne
+          <ChevronDown className={`size-4 shrink-0 transition-transform ${officesOpen ? "" : "-rotate-90"}`} />
         </button>
-      </div>
-      <p className="mt-3 text-sm">{office.address}</p>
-      <p className="mt-2 text-sm text-muted-foreground">{office.hours}</p>
-      <p className="mt-3 text-xs text-muted-foreground">Radno vrijeme je sa stranice cijena na kazup.hr.</p>
+        {officesOpen && (
+          <ul className="space-y-1">
+            {SALES_POINTS.map((point) => (
+              <li key={point.id}>
+                <button
+                  type="button"
+                  className={`flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left hover:bg-muted ${activeOffice === point.id ? "bg-muted" : ""}`}
+                  onClick={() => onOffice(point.id)}
+                >
+                  <span className="office-chip shrink-0">Blagajna</span>
+                  <span className="min-w-0">
+                    <span className="block text-sm">{point.place}</span>
+                    <span className="block text-xs text-muted-foreground">{point.hours}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

@@ -100,7 +100,7 @@ export function Header() {
                 pathname.startsWith("/admin") ? "bg-white text-[oklch(0.34_0.06_168)]" : "text-white/85 hover:bg-white/10"
               }`}
             >
-              Admin
+              Administrator
             </Link>
           )}
         </nav>
@@ -170,7 +170,7 @@ export function Header() {
           ))}
           {user?.role === "admin" && (
             <Link href="/admin" onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2 text-sm hover:bg-white/10">
-              Admin
+              Administrator
             </Link>
           )}
           {user ? (

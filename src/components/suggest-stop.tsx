@@ -29,7 +29,7 @@ function Pick({ onPick }: { onPick: (lat: number, lng: number) => void }) {
 
 export function SuggestStop() {
   const params = useSearchParams();
-  const { network, loading, user } = useKazu();
+  const { network, loading, user, refresh } = useKazu();
   const [query, setQuery] = useState("");
   const [stopId, setStopId] = useState(params.get("stop") ?? "");
   const [point, setPoint] = useState<[number, number] | null>(null);
@@ -75,7 +75,12 @@ export function SuggestStop() {
       if (!response.ok) throw new Error(data.error || "Prijedlog nije poslan.");
       setSent(true);
       setNote("");
-      toast.success("Prijedlog je poslan. Dispečer će ga pregledati.");
+      if (data.applied) {
+        toast.success("Lokacija je spremljena.");
+        await refresh();
+      } else {
+        toast.success("Prijedlog je poslan. Administrator će ga pregledati.");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Prijedlog nije poslan.");
     } finally {
@@ -90,7 +95,9 @@ export function SuggestStop() {
       <aside className="w-full shrink-0 border-b bg-background p-4 lg:w-[380px] lg:border-r lg:border-b-0">
         <h1 className="font-display text-3xl">Točna lokacija stajališta</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Ako stajalište na karti nije gdje autobus staje, klikni točno mjesto i pošalji. Može i bez prijave. Dispečer prijedlog prihvati ili odbije.
+          {user?.role === "admin"
+            ? "Klikni točno mjesto. Lokacija se odmah sprema, bez pregleda."
+            : "Ako stajalište na karti nije gdje autobus staje, klikni točno mjesto i pošalji. Može i bez prijave. Administrator prijedlog prihvati ili odbije."}
         </p>
         <label className="mt-4 block text-xs text-muted-foreground">
           Stajalište
@@ -124,9 +131,9 @@ export function SuggestStop() {
           />
         </label>
         <button type="button" className="mt-3 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground" disabled={busy} onClick={submit}>
-          {busy ? "Šaljem…" : "Pošalji prijedlog"}
+          {busy ? "Šaljem…" : user?.role === "admin" ? "Spremi lokaciju" : "Pošalji prijedlog"}
         </button>
-        {sent && <p className="mt-2 text-sm">Hvala. Prijedlog čeka pregled.</p>}
+        {sent && <p className="mt-2 text-sm">{user?.role === "admin" ? "Lokacija je na karti." : "Hvala. Prijedlog čeka pregled."}</p>}
         {user?.role === "admin" && (
           <Link href="/admin/prijedlozi" className="mt-4 inline-block text-sm text-primary">
             Pregled prijedloga

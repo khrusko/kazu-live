@@ -15,6 +15,7 @@ import type { DayType, Direction } from "@/lib/types";
 export function LineView({ id }: { id: string }) {
   const params = useSearchParams();
   const currentStopId = params.get("stop");
+  const smjer = params.get("smjer");
   const { network, loading, error, favoriteLineIds, toggleLine } = useKazu();
   const line = network?.lines.find((item) => item.id === id);
   const groups = useMemo(() => {
@@ -44,6 +45,28 @@ export function LineView({ id }: { id: string }) {
   const nextTrip = today
     ? trips.find((trip) => trip.times.some((time) => time && toMinutes(time) >= now.minutes))
     : undefined;
+  useEffect(() => {
+    if (!line) return;
+    if (smjer) {
+      for (let group = 0; group < groups.length; group += 1) {
+        const variant = groups[group][1].findIndex((item) => item.id === smjer);
+        if (variant >= 0) {
+          setGroupIndex(group);
+          setVariantIndex(variant);
+          return;
+        }
+      }
+    }
+    if (!currentStopId) return;
+    for (let group = 0; group < groups.length; group += 1) {
+      const variant = groups[group][1].findIndex((item) => item.stops.some((stop) => stop.stopId === currentStopId));
+      if (variant >= 0) {
+        setGroupIndex(group);
+        setVariantIndex(variant);
+        return;
+      }
+    }
+  }, [line, groups, smjer, currentStopId]);
   const rowRef = useRef<HTMLTableRowElement>(null);
   const hereName = currentStopId ? named.get(currentStopId)?.name : null;
   useEffect(() => {

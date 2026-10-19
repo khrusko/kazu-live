@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const user = await currentUser();
   if (!user || user.role !== "admin") {
-    return NextResponse.json({ error: "Samo dispečer može objaviti obavijest." }, { status: 403 });
+    return NextResponse.json({ error: "Samo administrator može objaviti obavijest." }, { status: 403 });
   }
   const body = (await request.json()) as {
     title?: string;
