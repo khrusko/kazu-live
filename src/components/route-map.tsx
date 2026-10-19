@@ -8,8 +8,10 @@ import "leaflet/dist/leaflet.css";
 
 export type RouteDraw = {
   parts: { color: string; code?: string; positions: [number, number][] }[];
-  pins: { lat: number; lng: number; label: string }[];
+  pins: { lat: number; lng: number; label: string; transfer?: boolean }[];
 };
+
+export type MapStop = { id: string; name: string; lat: number; lng: number };
 
 function lineTag(code: string, color: string, current: boolean) {
   const text = current ? `${code} · Trenutna ruta` : code;
@@ -22,6 +24,15 @@ function lineTag(code: string, color: string, current: boolean) {
   });
 }
 
+function transferTag() {
+  return L.divIcon({
+    className: "bus-pin",
+    html: `<span style="background:#1c1915">presjedanje</span>`,
+    iconSize: [104, 22],
+    iconAnchor: [52, 11],
+  });
+}
+
 function numberTag(number: number, current: boolean) {
   return L.divIcon({
     className: "bus-pin",
@@ -31,11 +42,7 @@ function numberTag(number: number, current: boolean) {
   });
 }
 
-function lineTags(
-  routes: RouteDraw[],
-  active: number,
-  colorFor: (index: number, partColor: string) => string,
-) {
+function lineTags(routes: RouteDraw[], active: number) {
   const tags = new Map<string, { code: string; color: string; position: [number, number]; active: boolean }>();
   routes.forEach((route, index) => {
     route.parts.forEach((part) => {
@@ -44,7 +51,7 @@ function lineTags(
       const previous = tags.get(part.code);
       const chosen = index === active;
       if (previous && !(chosen && !previous.active)) return;
-      tags.set(part.code, { code: part.code, color: chosen ? colorFor(index, part.color) : "#8b948e", position, active: chosen });
+      tags.set(part.code, { code: part.code, color: chosen ? part.color : "#8b948e", position, active: chosen });
     });
   });
   return [...tags.values()];
@@ -64,6 +71,19 @@ function Fit({ positions, signature }: { positions: [number, number][]; signatur
     // Refit when the journey changes, not on every parent render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, signature]);
+  return null;
+}
+
+function ZoomWatch({ onZoom }: { onZoom: (zoom: number) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    const sync = () => onZoom(map.getZoom());
+    sync();
+    map.on("zoomend", sync);
+    return () => {
+      map.off("zoomend", sync);
+    };
+  }, [map, onZoom]);
   return null;
 }
 
@@ -90,6 +110,10 @@ export function RouteMap({
   scrollWheel = false,
   focus,
   focusZoom = 12,
+  stops = [],
+  onPickStop,
+  originId,
+  destinationId,
 }: {
   routes: RouteDraw[];
   active: number;
@@ -98,22 +122,19 @@ export function RouteMap({
   scrollWheel?: boolean;
   focus?: [number, number];
   focusZoom?: number;
+  stops?: MapStop[];
+  onPickStop?: (id: string) => void;
+  originId?: string | null;
+  destinationId?: string | null;
 }) {
   const [satellite, setSatellite] = useState(false);
+  const [zoom, setZoom] = useState(11);
   const positions = routes.flatMap((route) => route.parts.flatMap((part) => part.positions));
   const center = positions[0] ?? focus ?? [45.49, 15.55];
   const signature = routes
-    .map((route) => route.parts.map((part) => `${part.code ?? ""}:${part.positions.length}:${part.positions[0]?.join(",") ?? ""}`).join("|"))
+    .map((route) => route.parts.map((part) => `${part.code ?? ""}:${part.color}:${part.positions.length}:${part.positions[0]?.join(",") ?? ""}`).join("|"))
     .join(";");
-  const palette = ["#2563eb", "#e11d48", "#0f766e", "#d97706"];
   const order = routes.map((_, index) => index).sort((a, b) => Number(a === active) - Number(b === active));
-  function colorFor(index: number, partColor: string) {
-    const own = new Set(routes[index]?.parts.map((part) => part.color) ?? []);
-    const clashes = [...own].some((color) =>
-      routes.some((route, other) => other !== index && route.parts.some((part) => part.color === color)),
-    );
-    return clashes ? palette[index % palette.length] : partColor;
-  }
 
   return (
     <div className={className ? `relative h-full w-full ${className}` : "relative h-56 w-full sm:h-72"}>
@@ -130,7 +151,7 @@ export function RouteMap({
                 key={`${index}-${partIndex}`}
                 positions={part.positions}
                 pathOptions={{
-                  color: chosen ? colorFor(index, part.color) : "#9aa39c",
+                  color: chosen ? part.color : "#9aa39c",
                   weight: chosen ? 6 : 4,
                   opacity: chosen ? 1 : 0.55,
                 }}
@@ -163,7 +184,7 @@ export function RouteMap({
             />
           );
         })}
-        {lineTags(routes, active, colorFor).map((tag) => (
+        {lineTags(routes, active).map((tag) => (
           <Marker
             key={`tag-${tag.code}`}
             position={tag.position}
@@ -172,16 +193,45 @@ export function RouteMap({
             zIndexOffset={tag.active ? 600 : 240}
           />
         ))}
-        {routes[active]?.pins.map((pin) => (
-          <CircleMarker
-            key={`${pin.label}-${pin.lat}`}
-            center={[pin.lat, pin.lng]}
-            radius={7}
-            pathOptions={{ color: "#1c1915", weight: 2, fillColor: "#f4e3b2", fillOpacity: 1 }}
-          >
-            <Tooltip>{pin.label}</Tooltip>
-          </CircleMarker>
-        ))}
+        {routes[active]?.pins.map((pin) =>
+          pin.transfer ? (
+            <Marker key={`transfer-${pin.label}-${pin.lat}`} position={[pin.lat, pin.lng]} icon={transferTag()} interactive={false} zIndexOffset={700} />
+          ) : (
+            <CircleMarker
+              key={`${pin.label}-${pin.lat}`}
+              center={[pin.lat, pin.lng]}
+              radius={7}
+              pathOptions={{ color: "#1c1915", weight: 2, fillColor: "#f4e3b2", fillOpacity: 1 }}
+            >
+              <Tooltip>{pin.label}</Tooltip>
+            </CircleMarker>
+          ),
+        )}
+        <ZoomWatch onZoom={setZoom} />
+        {onPickStop &&
+          stops.map((stop) => {
+            const chosenOrigin = stop.id === originId;
+            const chosenDestination = stop.id === destinationId;
+            const marked = chosenOrigin || chosenDestination;
+            if (!marked && positions.length >= 2 && zoom < 12) return null;
+            return (
+              <CircleMarker
+                key={stop.id}
+                center={[stop.lat, stop.lng]}
+                radius={marked ? 8 : 4}
+                bubblingMouseEvents={false}
+                pathOptions={{
+                  color: "#1c1915",
+                  weight: 2,
+                  fillColor: chosenDestination ? "#e11d48" : chosenOrigin ? "#0f766e" : "#ffffff",
+                  fillOpacity: 1,
+                }}
+                eventHandlers={{ click: () => onPickStop(stop.id) }}
+              >
+                <Tooltip permanent={marked}>{stop.name}</Tooltip>
+              </CircleMarker>
+            );
+          })}
         {positions.length >= 2 ? (
           <Fit positions={positions} signature={signature} />
         ) : (
