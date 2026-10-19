@@ -15,11 +15,19 @@ import { TimeDial } from "@/components/time-dial";
 import { DAY_LABEL, formatWait, showTime, toMinutes, zagrebParts } from "@/lib/time";
 import type { DayType, Line, Stop } from "@/lib/types";
 
+const LEG_COLORS = ["#2563eb", "#e11d48", "#0f766e", "#d97706"];
+
 function formatDuration(minutes: number) {
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest ? `${hours} h ${rest} min` : `${hours} h`;
+}
+
+function rideLabel(transfers: number) {
+  if (transfers <= 0) return "bez presjedanja";
+  if (transfers === 1) return "1 presjedanje";
+  return `${transfers} presjedanja`;
 }
 
 const RouteMap = dynamic(() => import("@/components/route-map").then((mod) => mod.RouteMap), {
@@ -150,6 +158,26 @@ export function TripHome() {
   const chosenRoute = Math.min(activeRoute, Math.max(0, drawn.length - 1));
   const hasRouteMap = drawn.some((route) => route.parts.length > 0);
 
+  function pickStop(id: string) {
+    if (!originId || editingOrigin) {
+      setOriginId(id);
+      setMeters(null);
+      setNearby([]);
+      setEditingOrigin(false);
+      setOriginQuery("");
+      if (destId === id) {
+        setDestId(null);
+        setDestQuery("");
+      }
+      return;
+    }
+    if (id === originId) return;
+    const stop = stops.find((item) => item.id === id);
+    if (!stop) return;
+    setDestId(stop.id);
+    setDestQuery(stop.name);
+  }
+
   if (loading) {
     return <p className="px-4 py-10 text-sm text-muted-foreground">Učitavam vozni red…</p>;
   }
@@ -197,8 +225,8 @@ export function TripHome() {
                 : hasFix
                   ? "Lokacija je već uključena. Možete je ponovo uzeti ili upisati drugo mjesto."
                   : loc === "denied"
-                    ? "Preglednik nije dao lokaciju. Upišite mjesto polaska ili pokušajte ponovo."
-                    : "Uključite lokaciju pa ćemo odabrati stajalište do kojeg ste najbliže."}
+                    ? "Preglednik nije dao lokaciju. Upišite mjesto polaska ili kliknite stanicu na karti."
+                    : "Uključite lokaciju, upišite mjesto ili kliknite stanicu na karti."}
             </p>
             <Button className="mt-3 h-12 w-full text-base" size="lg" onClick={locate} disabled={loc === "pending"}>
               <LocateFixed className="size-4" />
@@ -273,10 +301,37 @@ export function TripHome() {
         )}
       </section>
 
+      {!wide && (
+        <section className="mt-3 overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/10">
+          <p className="px-4 pt-3 text-xs text-muted-foreground">
+            {!origin || editingOrigin
+              ? "Kliknite stanicu za polazište."
+              : !destination
+                ? "Kliknite stanicu za odredište."
+                : planned.items.length > 1
+                  ? "Odabrana ruta je puna. Svako presjedanje mijenja boju."
+                  : "Odredište možete promijeniti klikom na drugu stanicu."}
+          </p>
+          <RouteMap
+            routes={hasRouteMap ? drawn : []}
+            active={chosenRoute}
+            onSelect={drawn.length > 1 ? setActiveRoute : undefined}
+            className="mt-2 h-72"
+            focus={origin ? [origin.lat, origin.lng] : [45.49, 15.55]}
+            focusZoom={origin ? 13 : 11}
+            stops={stops}
+            onPickStop={pickStop}
+            originId={originId}
+            destinationId={destId}
+          />
+        </section>
+      )}
+
       {origin && !editingOrigin && (
         <>
           <section className="mt-3 rounded-3xl bg-card p-4 ring-1 ring-foreground/10">
             <label className="text-sm font-medium" htmlFor="dest">Kamo</label>
+            <p className="mt-1 text-xs text-muted-foreground">Upišite odredište ili kliknite stanicu na karti.</p>
             <Input
               id="dest"
               value={destination ? destination.name : destQuery}
@@ -348,7 +403,7 @@ export function TripHome() {
               items={planned.items}
               active={chosenRoute}
               onSelect={setActiveRoute}
-              showMap={!wide}
+              showMap={false}
               showChoices={!wide}
               later={planned.later}
               laterNote={
@@ -383,10 +438,19 @@ export function TripHome() {
                 className="h-full"
                 focus={origin ? [origin.lat, origin.lng] : [45.49, 15.55]}
                 focusZoom={origin ? 13 : 11}
+                stops={stops}
+                onPickStop={pickStop}
+                originId={originId}
+                destinationId={destId}
               />
             )}
           </div>
         </div>
+        {(!origin || editingOrigin || !destination) && (
+          <p className="px-4 pb-2 text-center text-xs text-muted-foreground">
+            {!origin || editingOrigin ? "Kliknite stanicu za polazište ili je upišite lijevo." : "Kliknite stanicu za odredište ili je upišite lijevo."}
+          </p>
+        )}
         {destination && planned.items.length > 0 && (
           <RouteChoices items={planned.items} active={chosenRoute} onSelect={setActiveRoute} showWait={showWait} later={planned.later} nowMinutes={now.minutes} />
         )}
@@ -397,19 +461,25 @@ export function TripHome() {
 
 function drawPlan(plan: Itinerary | undefined, lines: Line[]) {
   if (!plan) return null;
-    const parts: { color: string; code: string; positions: [number, number][] }[] = [];
-  const pins: { lat: number; lng: number; label: string }[] = [];
-  for (const leg of plan.legs) {
+  const parts: { color: string; code: string; positions: [number, number][] }[] = [];
+  const pins: { lat: number; lng: number; label: string; transfer?: boolean }[] = [];
+  const several = plan.legs.length > 1;
+  plan.legs.forEach((leg, legIndex) => {
     const direction = lines.find((line) => line.id === leg.lineId)?.directions.find((item) => item.id === leg.directionId);
-    if (!direction) continue;
+    if (!direction) return;
     const positions = legShape(direction, leg.originIndex, leg.destinationIndex);
-    if (positions.length) parts.push({ color: leg.color, code: leg.code, positions });
+    const color = several ? LEG_COLORS[legIndex % LEG_COLORS.length] : leg.color;
+    if (positions.length) parts.push({ color, code: leg.code, positions });
     const origin = stopOnShape(direction, leg.originIndex);
     const destination = stopOnShape(direction, leg.destinationIndex);
+    const transfer = legIndex < plan.legs.length - 1;
     if (origin) pins.push({ lat: origin[0], lng: origin[1], label: leg.originName });
-    if (destination) pins.push({ lat: destination[0], lng: destination[1], label: leg.destinationName });
-  }
+    if (destination) pins.push({ lat: destination[0], lng: destination[1], label: leg.destinationName, transfer });
+  });
   const uniquePins = pins.filter((pin, index) => pins.findIndex((item) => item.label === pin.label) === index);
+  for (const pin of uniquePins) {
+    if (pins.some((item) => item.label === pin.label && item.transfer)) pin.transfer = true;
+  }
   return { parts, pins: uniquePins };
 }
 
@@ -431,7 +501,7 @@ function RouteChoices({
   return (
     <div className="shrink-0 px-4 pt-1 pb-4">
       {items.length > 1 && <p className="mb-2 text-xs text-muted-foreground">Odaberi rutu</p>}
-      <ul className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(items.length, 4)}, minmax(0, 1fr))` }}>
+      <ul className="flex flex-wrap gap-2">
         {items.map((item, index) => {
           const start = item.legs[0];
           const end = item.legs[item.legs.length - 1];
@@ -439,19 +509,20 @@ function RouteChoices({
           const duration = formatDuration(item.arriveMinutes - item.departMinutes);
           const body = (
             <>
-              <span className="flex items-baseline justify-between gap-2">
+              <span className="flex items-baseline justify-between gap-3">
                 <span className="font-display text-xl leading-none">{index + 1}.</span>
-                <span className="text-sm font-medium">{duration}</span>
+                <span className="shrink-0 text-sm font-medium">{duration}</span>
               </span>
-              <span className="mt-1 block truncate text-sm">{item.legs.map((leg) => leg.code).join(" → ")}</span>
+              <span className="mt-1 block text-sm font-medium">{rideLabel(item.transfers)}</span>
+              <span className="mt-0.5 block text-sm">{item.legs.map((leg) => `Linija ${leg.code}`).join(" → ")}</span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
-                {showTime(start.depart)}–{showTime(end.arrive)}
+                Polazak {showTime(start.depart)} · dolazak {showTime(end.arrive)}
                 {showWait && !later ? ` · ${formatWait(start.departMinutes - nowMinutes)}` : ""}
               </span>
             </>
           );
           return (
-            <li key={`${item.legs.map((leg) => leg.lineId).join("-")}-${start.depart}`}>
+            <li key={`${item.legs.map((leg) => leg.lineId).join("-")}-${start.depart}`} className="w-full max-w-sm min-w-64 flex-1">
               {items.length > 1 ? (
                 <button
                   type="button"
@@ -527,8 +598,7 @@ function PlanResult({
                   onClick={() => onSelect(index)}
                   className={`w-full rounded-2xl px-3 py-2 text-left text-sm ${chosen ? "bg-accent ring-1 ring-foreground/15" : "bg-muted"}`}
                 >
-                  <span className="font-medium">{index + 1}.</span>
-                  <span className="text-muted-foreground"> {item.transfers === 0 ? "bez presjedanja" : "presjedanje"}</span>
+                  <span className="font-medium">{index + 1}. {rideLabel(item.transfers)}</span>
                   <span className="mt-0.5 block">{path}</span>
                   <span className="text-muted-foreground">
                     {item.legs.map((leg) => `Linija ${leg.code}`).join(" → ")} · {showTime(start.depart)} Polazak
