@@ -10,8 +10,7 @@ export default function LinesPage() {
   if (error || !network) return <p className="p-8 text-sm">{error}</p>;
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
-      <p className="text-sm text-muted-foreground">Sizel · neslužbeni vozni red · 33 linije</p>
-      <h1 className="font-display mt-1 text-4xl">Linije</h1>
+      <h1 className="font-display text-4xl">Linije</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         Podaci su preuzeti sa službenih rasporeda na kazup.hr.
       </p>

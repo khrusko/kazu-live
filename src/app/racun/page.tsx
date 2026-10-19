@@ -75,7 +75,7 @@ export default function AccountPage() {
 
       <section className="mt-4 rounded-2xl bg-card p-4 ring-1 ring-foreground/10">
         <h2 className="font-medium">Omiljene linije</h2>
-        {favoriteLineIds.length === 0 && <p className="mt-2 text-sm text-muted-foreground">Još nema srca na karti. Obavijesti će onda biti opće.</p>}
+        {favoriteLineIds.length === 0 && <p className="mt-2 text-sm text-muted-foreground">Još nema omiljenih linija. Označite srce uz liniju pa će se obavijesti za nju izdvojiti.</p>}
         <ul className="mt-2 space-y-1">
           {favoriteLineIds.map((id) => {
             const line = network?.lines.find((item) => item.id === id);

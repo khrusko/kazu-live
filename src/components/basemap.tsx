@@ -1,25 +1,18 @@
 "use client";
 
-import { TileLayer, WMSTileLayer } from "react-leaflet";
+import { TileLayer } from "react-leaflet";
 
 const OSM = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const ORTHOPHOTO = "https://geoportal.dgu.hr/services/inspire/orthophoto_2024/wms";
+const SATELLITE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
 export function Basemap({ satellite }: { satellite: boolean }) {
   if (satellite) {
     return (
-      <WMSTileLayer
-        key="dof"
-        url={ORTHOPHOTO}
-        layers="OI.OrthoimageCoverage"
-        styles="OI.OrthoimageCoverage.Default"
-        format="image/jpeg"
-        version="1.3.0"
-        transparent={false}
-        uppercase
+      <TileLayer
+        key="satellite"
+        url={SATELLITE}
         maxZoom={19}
-        updateWhenIdle={false}
-        attribution='Ortofoto &copy; <a href="https://geoportal.dgu.hr/">DGU Geoportal</a>'
+        attribution='Satelit &copy; <a href="https://www.esri.com/">Esri</a>'
       />
     );
   }

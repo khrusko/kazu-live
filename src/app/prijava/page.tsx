@@ -41,7 +41,7 @@ function LoginForm() {
   return (
     <div className="mx-auto w-full max-w-md px-4 py-10">
       <h1 className="font-display text-4xl">Prijava</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Račun treba za karte, favorite na svim uređajima i administratorski unos.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Prijavite se za omiljene linije na svim uređajima ili za unos u vozni red.</p>
       <form onSubmit={submit} className="mt-6 space-y-3">
         <div>
           <Label htmlFor="email">E-mail</Label>

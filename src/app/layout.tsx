@@ -19,8 +19,21 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Sizel - autobusne linije Karlovačke županije",
-  description: "Autobusne linije Karlovačke županije. Neslužbena stranica, nepovezana s Karlovačkom županijom.",
+  metadataBase: new URL("https://busevi.sizel.eu"),
+  title: "Sizel — vozni red Karlovačke županije",
+  description: "Vozni red i linije Karlovačke županije. Neslužbena stranica, nepovezana s Karlovačkom županijom.",
+  openGraph: {
+    title: "Sizel",
+    description: "Vozni red i linije Karlovačke županije",
+    siteName: "Sizel",
+    locale: "hr_HR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sizel",
+    description: "Vozni red i linije Karlovačke županije",
+  },
 };
 
 export const viewport: Viewport = {

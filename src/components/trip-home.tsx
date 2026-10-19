@@ -11,6 +11,7 @@ import { useKazu } from "@/components/providers";
 import { fold, formatMeters, pickNearest } from "@/lib/geo";
 import { planJourneys, type Itinerary } from "@/lib/plan";
 import { departuresForStop, legShape, linesAtStop, stopOnShape } from "@/lib/schedule";
+import { TimeDial } from "@/components/time-dial";
 import { DAY_LABEL, formatWait, showTime, toMinutes, zagrebParts } from "@/lib/time";
 import type { DayType, Line, Stop } from "@/lib/types";
 
@@ -33,6 +34,9 @@ export function TripHome() {
   const [now, setNow] = useState(() => zagrebParts());
   const [dayChoice, setDayChoice] = useState<DayType | null>(null);
   const [timeChoice, setTimeChoice] = useState("");
+  const [hasFix, setHasFix] = useState(false);
+  const [wide, setWide] = useState(false);
+  const [activeRoute, setActiveRoute] = useState(0);
   const [loc, setLoc] = useState<"idle" | "pending" | "ok" | "denied" | "unsupported">("idle");
   const [originId, setOriginId] = useState<string | null>(null);
   const [meters, setMeters] = useState<number | null>(null);
@@ -68,6 +72,7 @@ export function TripHome() {
     setNearby(pick.nearby);
     setEditingOrigin(false);
     setOriginQuery("");
+    setHasFix(true);
     setLoc("ok");
   }
 
@@ -95,6 +100,14 @@ export function TripHome() {
     // Ask once, when the timetable is ready.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stops.length]);
+
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setWide(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
 
   const origin = stops.find((stop) => stop.id === originId) ?? null;
   const destination = stops.find((stop) => stop.id === destId) ?? null;
@@ -128,6 +141,14 @@ export function TripHome() {
     () => planned.items.map((item) => drawPlan(item, lines) ?? { parts: [], pins: [] }),
     [planned.items, lines],
   );
+  const routeKey = `${originId}|${destId}|${activeDay}|${activeMinutes}|${planned.later}|${planned.items.map((item) => item.legs.map((leg) => `${leg.directionId}@${leg.depart}`).join(">")).join(";")}`;
+  const [routeKeySeen, setRouteKeySeen] = useState(routeKey);
+  if (routeKeySeen !== routeKey) {
+    setRouteKeySeen(routeKey);
+    setActiveRoute(0);
+  }
+  const chosenRoute = Math.min(activeRoute, Math.max(0, drawn.length - 1));
+  const hasRouteMap = drawn.some((route) => route.parts.length > 0);
 
   if (loading) {
     return <p className="px-4 py-10 text-sm text-muted-foreground">Učitavam vozni red…</p>;
@@ -137,7 +158,8 @@ export function TripHome() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+    <main className="mx-auto w-full max-w-lg px-4 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:grid lg:h-full lg:max-w-none lg:grid-cols-[minmax(22rem,28rem)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden lg:px-0 lg:pt-0 lg:pb-0">
+      <div className="lg:h-full lg:overflow-y-auto lg:px-4 lg:pt-4 lg:pb-6">
       <p className="text-xs tracking-wide text-muted-foreground uppercase">{now.dateLabel} · {now.clock} · {DAY_LABEL[now.day]}</p>
       <h1 className="font-display mt-1 text-4xl leading-none">Kamo putujete?</h1>
       <p className="mt-2 text-sm text-muted-foreground">
@@ -157,31 +179,7 @@ export function TripHome() {
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <span>Polazak od</span>
-        <label className="sr-only" htmlFor="depart-hour">Sat</label>
-        <select
-          id="depart-hour"
-          className="h-10 rounded-xl border bg-card px-2"
-          value={(timeChoice || now.clock).slice(0, 2)}
-          onChange={(event) => setTimeChoice(`${event.target.value}:${(timeChoice || now.clock).slice(3, 5)}`)}
-        >
-          {Array.from({ length: 24 }, (_, hour) => {
-            const value = String(hour).padStart(2, "0");
-            return <option key={value} value={value}>{value}</option>;
-          })}
-        </select>
-        <span>:</span>
-        <label className="sr-only" htmlFor="depart-minute">Minuta</label>
-        <select
-          id="depart-minute"
-          className="h-10 rounded-xl border bg-card px-2"
-          value={(timeChoice || now.clock).slice(3, 5)}
-          onChange={(event) => setTimeChoice(`${(timeChoice || now.clock).slice(0, 2)}:${event.target.value}`)}
-        >
-          {Array.from({ length: 60 }, (_, minute) => {
-            const value = String(minute).padStart(2, "0");
-            return <option key={value} value={value}>{value}</option>;
-          })}
-        </select>
+        <TimeDial value={timeChoice || now.clock} onChange={setTimeChoice} />
         {customWhen && (
           <button type="button" className="text-primary" onClick={() => { setDayChoice(null); setTimeChoice(""); }}>
             Trenutno vrijeme
@@ -192,19 +190,21 @@ export function TripHome() {
       <section className="mt-4 rounded-3xl bg-card p-4 ring-1 ring-foreground/10">
         {!origin || editingOrigin ? (
           <div>
-            <p className="text-sm font-medium">Najbliže stajalište</p>
+            <p className="text-sm font-medium">{hasFix ? "Mjesto polaska" : "Najbliže stajalište"}</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {loc === "pending"
                 ? "Tražim lokaciju…"
-                : loc === "denied"
-                  ? "Preglednik nije dao lokaciju. Upišite stajalište ili pokušajte ponovo."
-                  : "Uključite lokaciju pa ćemo odabrati stajalište do kojeg ste najbliže."}
+                : hasFix
+                  ? "Lokacija je već uključena. Možete je ponovo uzeti ili upisati drugo mjesto."
+                  : loc === "denied"
+                    ? "Preglednik nije dao lokaciju. Upišite mjesto polaska ili pokušajte ponovo."
+                    : "Uključite lokaciju pa ćemo odabrati stajalište do kojeg ste najbliže."}
             </p>
             <Button className="mt-3 h-12 w-full text-base" size="lg" onClick={locate} disabled={loc === "pending"}>
               <LocateFixed className="size-4" />
-              {loc === "pending" ? "Tražim…" : "Uključi lokaciju"}
+              {loc === "pending" ? "Tražim…" : hasFix ? "Odaberi trenutnu lokaciju" : "Uključi lokaciju"}
             </Button>
-            <label className="mt-4 block text-xs text-muted-foreground">Ili upišite stajalište</label>
+            <label className="mt-4 block text-xs text-muted-foreground">ili upišite mjesto polaska</label>
             <Input
               value={originQuery}
               onChange={(event) => setOriginQuery(event.target.value)}
@@ -345,8 +345,10 @@ export function TripHome() {
 
           {destination && (
             <PlanResult
-              key={`${originId}|${destId}|${activeDay}|${activeMinutes}|${planned.later}|${planned.items.map((item) => item.legs.map((leg) => leg.directionId).join(">")).join(";")}`}
               items={planned.items}
+              active={chosenRoute}
+              onSelect={setActiveRoute}
+              showMap={!wide}
               later={planned.later}
               laterNote={
                 planned.later
@@ -367,6 +369,24 @@ export function TripHome() {
           )}
         </>
       )}
+      </div>
+      <div className="relative hidden bg-[#e7eee8] lg:block lg:h-full lg:min-h-0">
+        {wide && destination && hasRouteMap ? (
+          <div className="absolute inset-0">
+            <RouteMap
+              routes={drawn}
+              active={chosenRoute}
+              onSelect={drawn.length > 1 ? setActiveRoute : undefined}
+              scrollWheel
+              className="h-full"
+            />
+          </div>
+        ) : (
+          <div className="grid h-full place-items-center px-10 text-center text-sm text-muted-foreground">
+            Karta rute pojavljuje se nakon odabira odredišta.
+          </div>
+        )}
+      </div>
     </main>
   );
 }
@@ -391,6 +411,9 @@ function drawPlan(plan: Itinerary | undefined, lines: Line[]) {
 
 function PlanResult({
   items,
+  active,
+  onSelect,
+  showMap,
   later,
   laterNote,
   hint,
@@ -399,6 +422,9 @@ function PlanResult({
   drawn,
 }: {
   items: Itinerary[];
+  active: number;
+  onSelect: (index: number) => void;
+  showMap: boolean;
   later: boolean;
   laterNote: string | null;
   hint: string;
@@ -406,7 +432,6 @@ function PlanResult({
   nowMinutes: number;
   drawn: { parts: { color: string; code: string; positions: [number, number][] }[]; pins: { lat: number; lng: number; label: string }[] }[];
 }) {
-  const [active, setActive] = useState(0);
   const plan = items[Math.min(active, Math.max(0, items.length - 1))];
   if (!plan) {
     return (
@@ -435,11 +460,11 @@ function PlanResult({
               <li key={`${item.legs.map((leg) => leg.lineId).join("-")}-${start.depart}`}>
                 <button
                   type="button"
-                  onClick={() => setActive(index)}
+                  onClick={() => onSelect(index)}
                   className={`w-full rounded-2xl px-3 py-2 text-left text-sm ${chosen ? "bg-accent ring-1 ring-foreground/15" : "bg-muted"}`}
                 >
-                  <span className="font-medium">{String.fromCharCode(65 + index)}</span>
-                  <span className="text-muted-foreground"> · {item.transfers === 0 ? "bez presjedanja" : "presjedanje"}</span>
+                  <span className="font-medium">{index + 1}.</span>
+                  <span className="text-muted-foreground"> {item.transfers === 0 ? "bez presjedanja" : "presjedanje"}</span>
                   <span className="mt-0.5 block">{path}</span>
                   <span className="text-muted-foreground">
                     {item.legs.map((leg) => `Linija ${leg.code}`).join(" → ")} · {showTime(start.depart)} Polazak
@@ -502,12 +527,12 @@ function PlanResult({
           Otvori na karti
         </Button>
       </div>
-      {hasMap && (
+      {showMap && hasMap && (
         <div className="border-t">
           {items.length > 1 && (
-            <p className="px-4 pt-3 text-xs text-muted-foreground">Sve opcije su na karti. Dodirni liniju da je odabereš.</p>
+            <p className="px-4 pt-3 text-xs text-muted-foreground">Sve opcije su na karti. Odabrana je puna, ostale su svjetlije. Dodirni liniju da je odabereš.</p>
           )}
-          <RouteMap routes={drawn} active={Math.min(active, drawn.length - 1)} onSelect={setActive} />
+          <RouteMap routes={drawn} active={Math.min(active, drawn.length - 1)} onSelect={items.length > 1 ? onSelect : undefined} />
         </div>
       )}
     </section>
