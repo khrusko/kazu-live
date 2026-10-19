@@ -10,7 +10,7 @@ export default function AdminHome() {
   if (!user || user.role !== "admin") {
     return (
       <div className="mx-auto max-w-md px-4 py-12">
-        <h1 className="font-display text-3xl">Dispečer</h1>
+        <h1 className="font-display text-3xl">Administrator</h1>
         <p className="mt-2 text-sm">Ovaj dio je za izmjenu voznog reda. Prijavite se kao admin.</p>
         <Link href="/prijava?next=/admin" className="mt-3 inline-block text-sm text-primary">Prijava</Link>
       </div>
@@ -18,7 +18,7 @@ export default function AdminHome() {
   }
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
-      <p className="text-sm text-muted-foreground">Dispečerski stol</p>
+      <p className="text-sm text-muted-foreground">Administracija</p>
       <h1 className="font-display text-4xl">Izmjena reda ide odmah na kartu</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         Spremljeni polazak putnici vide u roku od nekoliko sekundi, bez novog PDF-a. Uz izmjenu možete objaviti obavijest za omiljene linije.

@@ -24,6 +24,9 @@ export type LiveBus = {
   headsign: string;
   from: string;
   to: string;
+  fromTime: string;
+  toTime: string;
+  heading: number;
 };
 
 export type Ride = {
@@ -106,6 +109,9 @@ export function liveBuses(lines: Line[], stops: Stop[], day: DayType, minutes: n
           headsign: headsign(direction, named),
           from: placed.from,
           to: placed.to,
+          fromTime: placed.fromTime,
+          toTime: placed.toTime,
+          heading: placed.heading,
         });
       }
     }
@@ -133,32 +139,44 @@ export function stopOnShape(direction: Direction, index: number): [number, numbe
   return direction.geometry[index] ?? null;
 }
 
-function pointAlong(line: [number, number][], ratio: number): [number, number] {
-  if (!line.length) return [0, 0];
-  if (line.length === 1 || ratio <= 0) return line[0];
-  if (ratio >= 1) return line[line.length - 1];
+function bearing(from: [number, number], to: [number, number]) {
+  const degrees = (Math.atan2(to[1] - from[1], to[0] - from[0]) * 180) / Math.PI;
+  return Number.isFinite(degrees) ? degrees : 0;
+}
+
+function pointAlong(line: [number, number][], ratio: number): { point: [number, number]; heading: number } {
+  if (!line.length) return { point: [0, 0], heading: 0 };
+  if (line.length === 1 || ratio <= 0) {
+    return { point: line[0], heading: line.length > 1 ? bearing(line[0], line[1]) : 0 };
+  }
+  if (ratio >= 1) {
+    return {
+      point: line[line.length - 1],
+      heading: bearing(line[line.length - 2], line[line.length - 1]),
+    };
+  }
   const lengths: number[] = [];
   let total = 0;
   for (let index = 1; index < line.length; index += 1) {
-    const dLat = line[index][0] - line[index - 1][0];
-    const dLng = line[index][1] - line[index - 1][1];
-    const length = Math.hypot(dLat, dLng);
-    lengths.push(length);
-    total += length;
+    lengths.push(Math.hypot(line[index][0] - line[index - 1][0], line[index][1] - line[index - 1][1]));
+    total += lengths[lengths.length - 1];
   }
-  if (total === 0) return line[0];
+  if (total === 0) return { point: line[0], heading: 0 };
   let remain = total * ratio;
   for (let index = 0; index < lengths.length; index += 1) {
     if (remain <= lengths[index] || index === lengths.length - 1) {
       const t = lengths[index] === 0 ? 0 : remain / lengths[index];
-      return [
-        line[index][0] + (line[index + 1][0] - line[index][0]) * t,
-        line[index][1] + (line[index + 1][1] - line[index][1]) * t,
-      ];
+      return {
+        point: [
+          line[index][0] + (line[index + 1][0] - line[index][0]) * t,
+          line[index][1] + (line[index + 1][1] - line[index][1]) * t,
+        ],
+        heading: bearing(line[index], line[index + 1]),
+      };
     }
     remain -= lengths[index];
   }
-  return line[line.length - 1];
+  return { point: line[line.length - 1], heading: bearing(line[line.length - 2], line[line.length - 1]) };
 }
 
 function placeOnTrip(
@@ -175,6 +193,7 @@ function placeOnTrip(
         minutes: toMinutes(time),
         index,
         name: stopName(stops, stop.stopId),
+        time,
       };
     })
     .filter((point): point is NonNullable<typeof point> => Boolean(point));
@@ -188,8 +207,16 @@ function placeOnTrip(
     if (minutes < start.minutes || minutes > end.minutes) continue;
     const span = end.minutes - start.minutes || 1;
     const ratio = Math.min(1, Math.max(0, (minutes - start.minutes) / span));
-    const [lat, lng] = pointAlong(legShape(direction, start.index, end.index), ratio);
-    return { lat, lng, from: start.name, to: end.name };
+    const placed = pointAlong(legShape(direction, start.index, end.index), ratio);
+    return {
+      lat: placed.point[0],
+      lng: placed.point[1],
+      heading: placed.heading,
+      from: start.name,
+      to: end.name,
+      fromTime: start.time,
+      toTime: end.time,
+    };
   }
   return null;
 }

@@ -60,7 +60,7 @@ export function ReviewSuggestions() {
     return (
       <div className="mx-auto max-w-md px-4 py-12">
         <h1 className="font-display text-3xl">Prijedlozi lokacija</h1>
-        <p className="mt-2 text-sm">Ovo može samo dispečer.</p>
+        <p className="mt-2 text-sm">Ovo može samo administrator.</p>
         <Link href="/prijava?next=/admin/prijedlozi" className="mt-3 inline-block text-sm text-primary">
           Prijava
         </Link>
@@ -97,7 +97,7 @@ export function ReviewSuggestions() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6">
       <Link href="/admin" className="text-xs text-muted-foreground">
-        Dispečer
+        Administrator
       </Link>
       <h1 className="font-display text-3xl">Prijedlozi lokacija</h1>
       <p className="mt-1 text-sm text-muted-foreground">Siva oznaka je trenutno mjesto, zelena je prijedlog.</p>

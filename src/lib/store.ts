@@ -95,7 +95,7 @@ function seed(): Store {
     {
       id: "u_admin",
       email: "admin@kazide.hr",
-      name: "Dispečer županije",
+      name: "Administrator",
       role: "admin",
       category: "puni",
       favoriteLineIds: [],
@@ -141,6 +141,9 @@ export function readStore(): Store {
   ensure();
   const store = JSON.parse(fs.readFileSync(storeFilePath(), "utf8")) as Store;
   if (!Array.isArray(store.suggestions)) store.suggestions = [];
+  for (const user of store.users) {
+    if (user.role === "admin" && /dispečer/i.test(user.name)) user.name = "Administrator";
+  }
   return store;
 }
 
@@ -245,6 +248,11 @@ export function placeStop(store: Store, stopId: string, lat: number, lng: number
   stop.lat = round6(lat);
   stop.lng = round6(lng);
   stop.precision = precision;
+  if (precision === "admin") {
+    for (const suggestion of store.suggestions) {
+      if (suggestion.stopId === stopId && suggestion.status === "ceka") suggestion.status = "odbijeno";
+    }
+  }
   const roads = readRoads();
   for (const line of store.lines) {
     for (const direction of line.directions) {
@@ -290,6 +298,37 @@ export function replaceSegment(store: Store, directionId: string, fromIndex: num
     direction.shapeAnchors = nextAnchors;
     direction.geometry[fromIndex] = start;
     direction.geometry[fromIndex + 1] = end;
+    return direction;
+  }
+  throw new Error("Smjer ne postoji.");
+}
+
+/** Replace one direction's road line. Stop vertices stay on the stops. */
+export function replaceShape(store: Store, directionId: string, points: [number, number][], anchors: number[]) {
+  for (const line of store.lines) {
+    const direction = line.directions.find((item) => item.id === directionId);
+    if (!direction) continue;
+    if (anchors.length !== direction.stops.length) throw new Error("Cesta nema čvor za svako stajalište.");
+    if (points.length < 2 || points.length > 8000) throw new Error("Linija ima previše ili premalo čvorova.");
+    let previous = -1;
+    for (const anchor of anchors) {
+      if (!Number.isInteger(anchor) || anchor < 0 || anchor >= points.length || anchor <= previous) {
+        throw new Error("Čvorovi stajališta nisu poredani uz liniju.");
+      }
+      previous = anchor;
+    }
+    const shape = points.map((point) => {
+      if (!inServiceArea(point[0], point[1])) throw new Error("Čvor je izvan područja linija.");
+      return [round6(point[0]), round6(point[1])] as [number, number];
+    });
+    direction.stops.forEach((call, index) => {
+      const stop = store.stops.find((item) => item.id === call.stopId);
+      if (!stop) throw new Error("Stajalište na liniji ne postoji.");
+      direction.geometry[index] = [stop.lat, stop.lng];
+      shape[anchors[index]] = [stop.lat, stop.lng];
+    });
+    direction.shape = shape;
+    direction.shapeAnchors = anchors.slice();
     return direction;
   }
   throw new Error("Smjer ne postoji.");

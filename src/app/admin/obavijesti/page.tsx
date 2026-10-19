@@ -18,7 +18,7 @@ export default function AdminNewsPage() {
   const [busy, setBusy] = useState(false);
 
   if (loading) return <p className="p-8 text-sm">Učitavam…</p>;
-  if (!user || user.role !== "admin") return <p className="p-8 text-sm">Samo dispečer.</p>;
+  if (!user || user.role !== "admin") return <p className="p-8 text-sm">Samo administrator.</p>;
 
   async function publish() {
     setBusy(true);
@@ -53,7 +53,7 @@ export default function AdminNewsPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
-      <Link href="/admin" className="text-sm text-muted-foreground">Dispečer</Link>
+      <Link href="/admin" className="text-sm text-muted-foreground">Administrator</Link>
       <h1 className="font-display mt-1 text-4xl">Obavijest</h1>
       <div className="mt-4 space-y-3 rounded-2xl bg-card p-4 ring-1 ring-foreground/10">
         <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Naslov" className="h-9" />

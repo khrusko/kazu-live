@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function PUT(request: Request) {
   const user = await currentUser();
   if (!user || user.role !== "admin") {
-    return NextResponse.json({ error: "Samo dispečer pomiče stajališta." }, { status: 403 });
+    return NextResponse.json({ error: "Samo administrator pomiče stajališta." }, { status: 403 });
   }
   const body = (await request.json().catch(() => null)) as { id?: string; lat?: number; lng?: number } | null;
   const id = body?.id?.trim() ?? "";
