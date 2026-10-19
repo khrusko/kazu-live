@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Sizel, vozni red Karlovačke županije";
+export const alt = "Kazu bus · vozni red Karlovačke županije | Sizel";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

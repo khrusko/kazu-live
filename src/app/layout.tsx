@@ -6,6 +6,7 @@ import { CookieBanner } from "@/components/cookie-banner";
 import { Header } from "@/components/header";
 import { Providers } from "@/components/providers";
 import { SiteFooter } from "@/components/site-footer";
+import { defaultMetadata, websiteJsonLd } from "@/lib/seo";
 import "./globals.css";
 
 const figtree = Figtree({
@@ -18,23 +19,7 @@ const fraunces = Fraunces({
   variable: "--font-fraunces",
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL("https://busevi.sizel.eu"),
-  title: "Sizel — vozni red Karlovačke županije",
-  description: "Vozni red i linije Karlovačke županije. Neslužbena stranica, nepovezana s Karlovačkom županijom.",
-  openGraph: {
-    title: "Sizel",
-    description: "Vozni red i linije Karlovačke županije",
-    siteName: "Sizel",
-    locale: "hr_HR",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Sizel",
-    description: "Vozni red i linije Karlovačke županije",
-  },
-};
+export const metadata: Metadata = defaultMetadata;
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -43,9 +28,11 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const jsonLd = websiteJsonLd();
   return (
     <html lang="hr" className={`${figtree.variable} ${fraunces.variable} h-full`} suppressHydrationWarning>
       <body className="flex h-dvh flex-col overflow-hidden antialiased">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         <ThemeProvider attribute="class" forcedTheme="light" enableSystem={false}>
           <Providers>
             <Header />
