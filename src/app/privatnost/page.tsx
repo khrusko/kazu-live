@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Politika privatnosti · Sizel",
-  description: "Kako Sizel obrađuje podatke na neslužbenoj stranici autobusnih linija Karlovačke županije.",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Politika privatnosti",
+  description: "Kako Sizel obrađuje podatke na neslužbenoj stranici autobusnih linija Karlovačke županije (Kazu / Kazup).",
+  path: "/privatnost",
+});
 
 export default function PrivacyPage() {
   return (
