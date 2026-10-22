@@ -6,7 +6,7 @@ import L from "leaflet";
 import proj4 from "proj4";
 
 const OSM = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const ORTHOPHOTO = "https://geoportal.dgu.hr/wms";
+const ORTHOPHOTO = "https://geoportal.dgu.hr/services/inspire/orthophoto_2024/wms";
 
 proj4.defs(
   "EPSG:3765",
@@ -33,8 +33,8 @@ const GeoportalOrtho = L.TileLayer.extend({
       "SERVICE=WMS",
       "VERSION=1.3.0",
       "REQUEST=GetMap",
-      "LAYERS=DOF",
-      "STYLES=",
+      "LAYERS=OI.OrthoimageCoverage",
+      "STYLES=OI.OrthoimageCoverage.Default",
       "FORMAT=image/jpeg",
       "TRANSPARENT=FALSE",
       "CRS=EPSG:3765",
@@ -54,7 +54,7 @@ function GeoportalLayer() {
       maxZoom: 19,
       maxNativeZoom: 18,
       updateWhenIdle: false,
-      attribution: 'Ortofoto &copy; <a href="https://geoportal.dgu.hr/">DGU Geoportal</a>',
+      attribution: 'Digitalni ortofoto 2024. &copy; <a href="https://geoportal.dgu.hr/">DGU Geoportal</a>',
     });
     layer.addTo(map);
     return () => {
