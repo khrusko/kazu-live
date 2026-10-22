@@ -12,7 +12,7 @@ type KazuContext = {
   user: PublicUser | null;
   favoriteLineIds: string[];
   favoriteStopIds: string[];
-  refresh: () => Promise<void>;
+  refresh: (options?: { minVersion?: number }) => Promise<void>;
   refreshUser: () => Promise<void>;
   setUser: (user: PublicUser | null) => void;
   toggleLine: (id: string) => Promise<void>;
@@ -43,11 +43,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [localFav, setLocalFav] = useState<LocalFav>({ lines: [], stops: [] });
   const versionRef = useRef(0);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options?: { minVersion?: number }) => {
+    if (options?.minVersion) versionRef.current = Math.max(versionRef.current, options.minVersion);
     const response = await fetch("/api/network", { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Vozni red nije učitan.");
-    versionRef.current = data.version;
+    if (typeof data.version === "number" && data.version < versionRef.current) return;
+    versionRef.current = data.version ?? versionRef.current;
     setNetwork(data);
     setError(null);
   }, []);
@@ -71,7 +73,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       fetch("/api/meta", { cache: "no-store" })
         .then((response) => response.json())
         .then((meta: { version?: number }) => {
-          if (meta.version && meta.version !== versionRef.current) return refresh();
+          if (meta.version && meta.version > versionRef.current) return refresh();
           return null;
         })
         .catch(() => undefined);

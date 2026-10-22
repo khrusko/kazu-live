@@ -3,9 +3,9 @@ import { readStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
+export async function GET() {
   try {
-    const store = readStore();
+    const store = await readStore();
     return NextResponse.json({ version: store.version, updatedAt: store.updatedAt });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Nema podataka.";
