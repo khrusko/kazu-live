@@ -46,6 +46,6 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  const suggestions = readStore().suggestions.filter((item) => item.status === "ceka");
+  const suggestions = (await readStore()).suggestions.filter((item) => item.status === "ceka");
   return NextResponse.json({ count: suggestions.length });
 }

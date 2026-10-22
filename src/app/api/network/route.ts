@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
-import { networkView, readStore } from "@/lib/store";
+import { networkView, readBundledNetwork, readStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
+export async function GET() {
   try {
-    return NextResponse.json(networkView(readStore()));
+    return NextResponse.json(networkView(await readStore()));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Vozni red nije dostupan.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    try {
+      return NextResponse.json(readBundledNetwork());
+    } catch {
+      const message = error instanceof Error ? error.message : "Vozni red nije dostupan.";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
   }
 }

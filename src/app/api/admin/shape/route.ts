@@ -18,8 +18,13 @@ export async function PUT(request: Request) {
   const anchors = Array.isArray(body?.anchors) ? body.anchors.map((anchor) => Number(anchor)) : [];
   if (!directionId) return NextResponse.json({ error: "Odaberi smjer." }, { status: 400 });
   try {
-    const direction = await updateStore((store) => replaceShape(store, directionId, points, anchors));
-    return NextResponse.json({ directionId: direction.id, shape: direction.shape, shapeAnchors: direction.shapeAnchors });
+    let version = 0;
+    const direction = await updateStore((store) => {
+      const updated = replaceShape(store, directionId, points, anchors);
+      version = store.version + 1;
+      return updated;
+    });
+    return NextResponse.json({ directionId: direction.id, shape: direction.shape, shapeAnchors: direction.shapeAnchors, version });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Cesta nije spremljena.";
     return NextResponse.json({ error: message }, { status: 400 });

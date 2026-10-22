@@ -12,12 +12,13 @@ import "leaflet/dist/leaflet.css";
 
 type LatLng = [number, number];
 
-function nodeIcon(kind: "stop" | "node" | "selected") {
-  const size = kind === "node" ? 12 : 18;
+function nodeIcon(kind: "stop" | "node" | "selected", zoom: number) {
+  const zoomedOut = zoom < 13;
+  const size = kind === "node" ? (zoomedOut ? 16 : 14) : kind === "selected" ? (zoomedOut ? 36 : 30) : zoomedOut ? 32 : 26;
   const color = kind === "selected" ? "#b45309" : kind === "stop" ? "#0f766e" : "#1c1915";
   return L.divIcon({
     className: "edit-pin",
-    html: `<div style="width:${size}px;height:${size}px;border-radius:99px;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)"></div>`,
+    html: `<div style="width:${size}px;height:${size}px;border-radius:99px;background:${color};border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5);cursor:pointer"></div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -86,6 +87,7 @@ function Vertices({
   busy,
   onSelect,
   onMove,
+  onDelete,
 }: {
   points: LatLng[];
   anchors: number[];
@@ -93,8 +95,10 @@ function Vertices({
   busy: boolean;
   onSelect: (index: number) => void;
   onMove: (index: number, lat: number, lng: number) => void;
+  onDelete: (index: number) => void;
 }) {
   const map = useMap();
+  const lastClick = useRef<{ index: number; at: number } | null>(null);
   const [bounds, setBounds] = useState<L.LatLngBounds | null>(null);
   const [zoom, setZoom] = useState(() => map.getZoom());
   useMapEvents({
@@ -117,7 +121,7 @@ function Vertices({
     .map((point, index) => ({ point, index }))
     .filter(({ point, index }) => {
       if (index === selected || anchorSet.has(index)) return true;
-      if (zoom < 13 || !bounds) return false;
+      if (zoom < 11 || !bounds) return false;
       return bounds.contains([point[0], point[1]]);
     })
     .slice(0, 400);
@@ -126,17 +130,31 @@ function Vertices({
     <>
       {visible.map(({ point, index }) => {
         const kind = index === selected ? "selected" : anchorSet.has(index) ? "stop" : "node";
+        const size = kind === "node" ? (zoom < 13 ? 16 : 14) : kind === "selected" ? (zoom < 13 ? 36 : 30) : zoom < 13 ? 32 : 26;
         return (
           <Marker
-            key={`${index}-${kind}`}
+            key={index}
             position={point}
-            icon={nodeIcon(kind)}
+            icon={nodeIcon(kind, zoom)}
             draggable={!busy}
-            zIndexOffset={kind === "node" ? 300 : 500}
+            zIndexOffset={kind === "node" ? 300 : 700}
             eventHandlers={{
               click: (event) => {
                 L.DomEvent.stopPropagation(event.originalEvent);
+                const now = Date.now();
+                const detail = event.originalEvent?.detail ?? 1;
+                const repeat = detail >= 2 || (lastClick.current?.index === index && now - lastClick.current.at < 450);
+                if (repeat) {
+                  lastClick.current = null;
+                  onDelete(index);
+                  return;
+                }
+                lastClick.current = { index, at: now };
                 onSelect(index);
+              },
+              dblclick: (event) => {
+                L.DomEvent.stop(event.originalEvent);
+                onDelete(index);
               },
               dragend: (event) => {
                 const latlng = event.target.getLatLng();
@@ -163,22 +181,61 @@ export function AdminRoadEditor() {
   const [savedSpan, setSavedSpan] = useState<{ from: number; to: number } | null>(null);
   const skip = useRef(false);
   const saving = useRef(false);
+  const dirtyRef = useRef(false);
+  const loadedId = useRef("");
+  const selectedRef = useRef<number | null>(null);
+  const busyRef = useRef(false);
+  const directionByLine = useRef<Record<string, string>>({});
+  const kept = useRef(new Map<string, { points: LatLng[]; anchors: number[]; version: number }>());
+  const removeRef = useRef<(index: number) => void>(() => undefined);
+  selectedRef.current = selected;
+  busyRef.current = busy;
 
   const line = network?.lines.find((item) => item.id === lineId) ?? network?.lines[0] ?? null;
   const direction = line?.directions.find((item) => item.id === directionId) ?? line?.directions[0] ?? null;
   const activeDirectionId = direction?.id ?? "";
 
+  function markDirty(value: boolean) {
+    dirtyRef.current = value;
+    setDirty(value);
+  }
+
   useEffect(() => {
     if (!direction) return;
-    const next = shapeOf(direction);
-    setDraftShape(next.points);
-    setDraftAnchors(next.anchors);
-    setSelected(null);
+    const version = network?.version ?? 0;
+    const remembered = kept.current.get(direction.id);
+    const fromNetwork = shapeOf(direction);
+    const source = remembered && remembered.version > version ? remembered : { points: fromNetwork.points, anchors: fromNetwork.anchors };
+    const sameDirection = loadedId.current === direction.id;
+    if (sameDirection && dirtyRef.current) return;
+    loadedId.current = direction.id;
+    dirtyRef.current = false;
+    setDraftShape(source.points.map((point) => [point[0], point[1]] as LatLng));
+    setDraftAnchors(source.anchors.slice());
     setDirty(false);
-    setSavedSpan(null);
-    // Reload the line only when the direction changes. A stop save must not wipe unsaved vertices.
+    if (!sameDirection) {
+      setSelected(null);
+      setSavedSpan(null);
+    }
+    // A newer saved shape wins over a stale network response. Unsaved vertices stay until the direction changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDirectionId]);
+  }, [activeDirectionId, network?.version]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.repeat || (event.key !== "Backspace" && event.key !== "Delete")) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) return;
+      }
+      if (selectedRef.current == null || busyRef.current) return;
+      event.preventDefault();
+      removeRef.current(selectedRef.current);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   if (loading) return <p className="p-8 text-sm">Učitavam…</p>;
   if (!user || user.role !== "admin") {
@@ -218,12 +275,14 @@ export function AdminRoadEditor() {
         : null;
 
   function chooseLine(id: string) {
+    if (line && direction) directionByLine.current[line.id] = direction.id;
     setLineId(id);
-    setDirectionId("");
+    setDirectionId(directionByLine.current[id] ?? "");
   }
 
   function chooseDirection(id: string) {
     setDirectionId(id);
+    if (line) directionByLine.current[line.id] = id;
   }
 
   function revert() {
@@ -232,7 +291,7 @@ export function AdminRoadEditor() {
     setDraftShape(next.points);
     setDraftAnchors(next.anchors);
     setSelected(null);
-    setDirty(false);
+    markDirty(false);
     setSavedSpan(null);
   }
 
@@ -256,19 +315,26 @@ export function AdminRoadEditor() {
     setDraftShape((points) => [...points.slice(0, at + 1), [lat, lng], ...points.slice(at + 1)]);
     setDraftAnchors((anchors) => anchors.map((anchor) => (anchor > at ? anchor + 1 : anchor)));
     setSelected(at + 1);
-    setDirty(true);
+    markDirty(true);
     setSavedSpan(null);
   }
 
-  function removeSelected() {
-    if (selected == null || anchorSet.has(selected) || draftShape.length < 3) return;
-    const index = selected;
+  function removeVertex(index: number) {
+    if (anchorSet.has(index)) {
+      toast.error("Stajalište se ne briše. Dvostruki klik i Delete brišu samo čvor ceste.");
+      return;
+    }
+    if (draftShape.length < 3) {
+      toast.error("Linija mora zadržati barem dva čvora.");
+      return;
+    }
     setDraftShape((points) => points.filter((_, item) => item !== index));
     setDraftAnchors((anchors) => anchors.map((anchor) => (anchor > index ? anchor - 1 : anchor)));
     setSelected(null);
-    setDirty(true);
+    markDirty(true);
     setSavedSpan(null);
   }
+  removeRef.current = removeVertex;
 
   async function saveMovedStop(stopId: string, lat: number, lng: number, points: LatLng[], anchors: number[], vertexIndex: number, previous: LatLng[]) {
     if (!direction || saving.current) return;
@@ -280,7 +346,6 @@ export function AdminRoadEditor() {
       .join(" → ");
     saving.current = true;
     setBusy(true);
-    let savedOk = false;
     try {
       const response = await fetch("/api/admin/stop-road", {
         method: "PUT",
@@ -294,23 +359,34 @@ export function AdminRoadEditor() {
       });
       const data = (await response.json()) as {
         error?: string;
+        version?: number;
         directions?: { id: string; shape: LatLng[]; shapeAnchors: number[]; routed: boolean; focus: { from: number; to: number } | null }[];
       };
       if (!response.ok) throw new Error(data.error || "Spremanje nije uspjelo.");
       const saved = data.directions?.find((item) => item.id === direction.id);
       if (!saved?.shape || !saved.shapeAnchors) throw new Error("Cesta nije spremljena.");
-      setDraftShape(saved.shape.map((point) => [point[0], point[1]]));
-      setDraftAnchors(saved.shapeAnchors.slice());
-      setSelected(saved.shapeAnchors[stopIndex] ?? null);
+      const savedPoints = saved.shape.map((point) => [point[0], point[1]] as LatLng);
+      const savedAnchors = saved.shapeAnchors.slice();
+      const version = Number(data.version) || (network?.version ?? 0) + 1;
+      for (const item of data.directions ?? []) {
+        if (!item.shape || !item.shapeAnchors) continue;
+        kept.current.set(item.id, {
+          points: item.shape.map((point) => [point[0], point[1]] as LatLng),
+          anchors: item.shapeAnchors.slice(),
+          version,
+        });
+      }
+      setDraftShape(savedPoints);
+      setDraftAnchors(savedAnchors);
+      setSelected(savedAnchors[stopIndex] ?? null);
       setSavedSpan(saved.focus);
-      setDirty(false);
-      savedOk = true;
+      markDirty(false);
       toast.success(saved.routed ? `Spremljeno. Nova ruta: ${label}.` : "Stajalište je spremljeno. Cesta nije dohvaćena, čvor je i dalje spojen sa susjedima.");
+      await refresh({ minVersion: version }).catch(() => undefined);
     } catch (error) {
       setDraftShape(previous.map((point) => [point[0], point[1]]));
       toast.error(error instanceof Error ? error.message : "Spremanje nije uspjelo.");
     }
-    if (savedOk) await refresh().catch(() => undefined);
     saving.current = false;
     setBusy(false);
   }
@@ -328,7 +404,7 @@ export function AdminRoadEditor() {
     }
     setDraftShape((points) => points.map((item, itemIndex) => (itemIndex === index ? point : item)));
     setSavedSpan(null);
-    setDirty(true);
+    markDirty(true);
   }
 
   async function saveRoad() {
@@ -342,12 +418,16 @@ export function AdminRoadEditor() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Cesta nije spremljena.");
-      setDraftShape(data.shape);
-      setDraftAnchors(data.shapeAnchors);
-      setDirty(false);
+      const points = (data.shape as LatLng[]).map((point) => [point[0], point[1]] as LatLng);
+      const anchors = (data.shapeAnchors as number[]).slice();
+      const version = Number(data.version) || (network?.version ?? 0) + 1;
+      kept.current.set(direction.id, { points, anchors, version });
+      setDraftShape(points);
+      setDraftAnchors(anchors);
+      markDirty(false);
       setSavedSpan(null);
       toast.success("Cesta je spremljena.");
-      await refresh();
+      await refresh({ minVersion: version }).catch(() => undefined);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Cesta nije spremljena.");
     } finally {
@@ -386,7 +466,7 @@ export function AdminRoadEditor() {
         }),
       );
       setSelected(from + (routed.waypointIndexes[1] ?? 1));
-      setDirty(true);
+      markDirty(true);
       setSavedSpan(null);
       toast.success("Čvor je povučen na cestu. Spremi ako tako treba ostati.");
     } catch (error) {
@@ -411,7 +491,7 @@ export function AdminRoadEditor() {
       setDraftShape(points);
       setDraftAnchors(routed.waypointIndexes);
       setSelected(null);
-      setDirty(true);
+      markDirty(true);
       setSavedSpan(null);
       toast.success("Smjer je povučen na cestu. Spremi ako tako treba ostati.");
     } catch (error) {
@@ -430,7 +510,7 @@ export function AdminRoadEditor() {
           </Link>
           <h1 className="font-display text-2xl">Stajališta i ceste</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Zelena točka je stajalište i spaja prethodni čvor sa sljedećim. Povuci je: cesta između tih čvorova odmah ide preko novog mjesta i sprema se. Crni čvor složi ručno i spremi ga gumbom Spremi cestu. Klik na liniju dodaje čvor.
+            Zelena točka je stajalište i spaja prethodni čvor sa sljedećim. Povuci je: cesta između tih čvorova odmah ide preko novog mjesta i sprema se. Crni čvor složi ručno i spremi ga gumbom Spremi cestu. Klik na liniju dodaje čvor. Dvostruki klik na crni čvor briše ga, isto kao tipka Delete ili Backspace.
           </p>
           <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
             <li className="flex items-center gap-2">
@@ -504,7 +584,7 @@ export function AdminRoadEditor() {
                   : "Povuci ga po karti. Cestu spremi gumbom iznad."}
               </p>
               {!selectedIsStop && (
-                <button type="button" className="mt-2 rounded-full bg-background px-3 py-1.5 text-xs" disabled={busy} onClick={removeSelected}>
+                <button type="button" className="mt-2 rounded-full bg-background px-3 py-1.5 text-xs" disabled={busy} onClick={() => removeVertex(selected)}>
                   Obriši čvor
                 </button>
               )}
@@ -536,7 +616,7 @@ export function AdminRoadEditor() {
         </ul>
       </aside>
       <div className="relative min-h-[320px] flex-1">
-        <MapContainer center={[45.4, 15.55]} zoom={10} className="h-full w-full" scrollWheelZoom fadeAnimation={false}>
+        <MapContainer center={[45.4, 15.55]} zoom={10} className="h-full w-full" scrollWheelZoom doubleClickZoom={false} fadeAnimation={false}>
           <Basemap satellite={satellite} />
           <FitShape points={draftShape} id={direction.id} />
           <ShowSavedSpan points={draftShape} span={savedSpan} />
@@ -567,6 +647,7 @@ export function AdminRoadEditor() {
               setSelected(index);
             }}
             onMove={moveVertex}
+            onDelete={removeVertex}
           />
         </MapContainer>
         <BasemapSwitch satellite={satellite} onChange={setSatellite} />

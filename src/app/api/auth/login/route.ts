@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as { email?: string; password?: string };
   const email = body.email?.trim().toLowerCase() ?? "";
   const password = body.password ?? "";
-  const user = readStore().users.find((item) => item.email === email);
+  const user = (await readStore()).users.find((item) => item.email === email);
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return NextResponse.json({ error: "E-mail ili lozinka nisu točni." }, { status: 401 });
   }

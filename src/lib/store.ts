@@ -37,8 +37,13 @@ function readRoads(): Record<string, RoadShape> {
 
 const globalStore = globalThis as typeof globalThis & {
   __kazuQueue?: Promise<unknown>;
-  __kazuStorePath?: string;
+  __kazuBackend?: Promise<StoreBackend>;
 };
+
+const BLOB_STORE = "kazu-live";
+const BLOB_KEY = "store";
+
+type StoreBackend = { kind: "file"; file: string } | { kind: "blobs" };
 
 function canWriteDir(dir: string): boolean {
   const probe = path.join(dir, `.kazu-write-probe-${process.pid}`);
@@ -57,17 +62,27 @@ function canWriteDir(dir: string): boolean {
   }
 }
 
-/** Local dev writes data/store.json. Netlify's /var/task is read-only, so fall back to the instance temp dir. */
-function storeFilePath(): string {
-  if (globalStore.__kazuStorePath) return globalStore.__kazuStorePath;
-  if (canWriteDir(dataDir)) {
-    globalStore.__kazuStorePath = path.join(dataDir, "store.json");
-    return globalStore.__kazuStorePath;
-  }
+function onNetlify(): boolean {
+  return process.env.NETLIFY === "true" || Boolean(process.env.NETLIFY_BLOBS_CONTEXT) || Boolean(process.env.NETLIFY_SITE_ID);
+}
+
+/** Local dev writes data/store.json. On Netlify the app directory is read-only, so edits go to site-wide Blobs and survive the next request. */
+function storeBackend(): Promise<StoreBackend> {
+  if (!globalStore.__kazuBackend) globalStore.__kazuBackend = Promise.resolve(chooseBackend());
+  return globalStore.__kazuBackend;
+}
+
+function chooseBackend(): StoreBackend {
+  if (canWriteDir(dataDir)) return { kind: "file", file: path.join(dataDir, "store.json") };
+  if (onNetlify()) return { kind: "blobs" };
   const runtimeDir = os.tmpdir();
   fs.mkdirSync(runtimeDir, { recursive: true });
-  globalStore.__kazuStorePath = path.join(runtimeDir, "kazu-live-store.json");
-  return globalStore.__kazuStorePath;
+  return { kind: "file", file: path.join(runtimeDir, "kazu-live-store.json") };
+}
+
+async function blobStore() {
+  const { getStore } = await import("@netlify/blobs");
+  return getStore({ name: BLOB_STORE, consistency: "strong" });
 }
 
 function queue(): Promise<unknown> {
@@ -127,38 +142,91 @@ function seed(): Store {
   };
 }
 
-function ensure() {
+function requireNetworkFile() {
   if (!fs.existsSync(networkPath)) {
     throw new Error("Nema data/network.json. Vozni red još nije uvezen.");
   }
-  const file = storeFilePath();
-  if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, JSON.stringify(seed()));
-  }
 }
 
-export function readStore(): Store {
-  ensure();
-  const store = JSON.parse(fs.readFileSync(storeFilePath(), "utf8")) as Store;
+function normalize(store: Store): Store {
   if (!Array.isArray(store.suggestions)) store.suggestions = [];
+  if (!Array.isArray(store.users)) store.users = [];
   for (const user of store.users) {
     if (user.role === "admin" && /dispečer/i.test(user.name)) user.name = "Administrator";
   }
   return store;
 }
 
+function readFileStore(file: string): Store {
+  requireNetworkFile();
+  if (!fs.existsSync(file)) {
+    const seeded = seed();
+    writeFileStore(file, seeded);
+    return seeded;
+  }
+  return normalize(JSON.parse(fs.readFileSync(file, "utf8")) as Store);
+}
+
+function writeFileStore(file: string, store: Store) {
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(store));
+  fs.renameSync(tmp, file);
+}
+
+async function readBlobStore(): Promise<Store> {
+  requireNetworkFile();
+  const saved = await (await blobStore()).get(BLOB_KEY, { type: "json" });
+  if (saved && typeof saved === "object") return normalize(structuredClone(saved) as Store);
+  const seeded = seed();
+  await (await blobStore()).setJSON(BLOB_KEY, seeded);
+  return seeded;
+}
+
+async function writeBlobStore(store: Store) {
+  try {
+    await (await blobStore()).setJSON(BLOB_KEY, store);
+  } catch {
+    throw new Error("Promjene nisu spremljene na poslužitelj. Pokušaj ponovno.");
+  }
+}
+
+export async function readStore(): Promise<Store> {
+  const backend = await storeBackend();
+  if (backend.kind === "file") return readFileStore(backend.file);
+  return readBlobStore();
+}
+
+/** Timetable baked into the deploy. Used only when the live store cannot be read, and never written back. */
+export function readBundledNetwork(): Network {
+  requireNetworkFile();
+  const raw = JSON.parse(fs.readFileSync(networkPath, "utf8")) as Store;
+  return networkView({
+    ...raw,
+    version: raw.version ?? 1,
+    users: [],
+    tickets: [],
+    suggestions: [],
+  });
+}
+
+async function writeStore(store: Store) {
+  const backend = await storeBackend();
+  if (backend.kind === "file") {
+    writeFileStore(backend.file, store);
+    return;
+  }
+  await writeBlobStore(store);
+}
+
 export function updateStore<T>(fn: (store: Store) => T, bump = true): Promise<T> {
-  const run = queue().then(() => {
-    const store = readStore();
+  const run = queue().then(async () => {
+    const store = await readStore();
     const result = fn(store);
     if (bump) {
       store.version += 1;
       store.updatedAt = new Date().toISOString();
     }
-    const file = storeFilePath();
-    const tmp = `${file}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(store));
-    fs.renameSync(tmp, file);
+    await writeStore(store);
     return result;
   });
   globalStore.__kazuQueue = run.then(
@@ -206,7 +274,7 @@ export async function currentUser(): Promise<PublicUser | null> {
   const jar = await cookies();
   const userId = readSession(jar.get(SESSION_COOKIE)?.value);
   if (!userId) return null;
-  const user = readStore().users.find((item) => item.id === userId);
+  const user = (await readStore()).users.find((item) => item.id === userId);
   return user ? toPublic(user) : null;
 }
 

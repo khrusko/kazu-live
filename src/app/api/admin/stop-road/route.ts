@@ -60,7 +60,7 @@ export async function PUT(request: Request) {
   if (!id) return NextResponse.json({ error: "Nema stajališta." }, { status: 400 });
   if (!inServiceArea(lat, lng)) return NextResponse.json({ error: "Koordinata je izvan područja linija." }, { status: 400 });
 
-  const view = networkView(readStore());
+  const view = networkView(await readStore());
   const affected = view.lines.flatMap((line) => line.directions).filter((direction) => direction.stops.some((call) => call.stopId === id));
   if (!view.stops.some((stop) => stop.id === id)) {
     return NextResponse.json({ error: "Stajalište ne postoji." }, { status: 400 });
@@ -87,8 +87,10 @@ export async function PUT(request: Request) {
 
   try {
     const planned = await reconnectDirections(drafts, id, [lat, lng], routeAlongRoads, (point) => inServiceArea(point[0], point[1]));
+    let version = 0;
     const saved = await updateStore((store) => {
       const stop = placeStop(store, id, lat, lng, "admin");
+      version = store.version + 1;
       const directions = planned.map((item) => {
         const direction = replaceShape(store, item.id, item.points, item.anchors);
         // Keep every other stop vertex where the draft left it. Only the moved stop is pinned to its new coordinate.
@@ -107,7 +109,7 @@ export async function PUT(request: Request) {
           focus: item.focus,
         };
       });
-      return { stop, directions };
+      return { stop, directions, version };
     });
     return NextResponse.json(saved);
   } catch (error) {

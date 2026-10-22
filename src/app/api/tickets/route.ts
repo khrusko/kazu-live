@@ -11,7 +11,7 @@ const TYPES: TicketType[] = ["jednokratna", "dnevna", "mjesecna", "godisnja"];
 export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Prijavite se." }, { status: 401 });
-  const tickets = readStore().tickets.filter((ticket) => user.role === "admin" || ticket.userId === user.id);
+  const tickets = (await readStore()).tickets.filter((ticket) => user.role === "admin" || ticket.userId === user.id);
   return NextResponse.json({ tickets: tickets.slice().reverse() });
 }
 

@@ -8,7 +8,7 @@ export async function GET() {
   if (!user || user.role !== "admin") {
     return NextResponse.json({ error: "Samo administrator vidi prijedloge." }, { status: 403 });
   }
-  const store = readStore();
+  const store = await readStore();
   const suggestions = store.suggestions
     .filter((item) => item.status === "ceka")
     .map((item) => ({
