@@ -1,42 +1,45 @@
-# KaŽu Live
+# Sizel Busevi
 
-Karta, vozni red i priprema online karata za županijske autobuse **KaŽu IDE BUS** u Karlovačkoj županiji.
+A map, timetable, and trip planner for the **KaŽu IDE BUS** county buses in Karlovac County, Croatia. The public site is [busevi.sizel.eu](https://busevi.sizel.eu).
 
-Službeni rasporedi su i dalje PDF-ovi na [kazup.hr](https://www.kazup.hr/index.php/kazu-ide-bus-vozni-red). Ova aplikacija ih pretvara u kartu: stajališta, iscrtane rute, polasci po danu, obavijesti i administratorski unos koji putnici vide odmah.
+The official schedules stay as PDFs on [kazup.hr](https://www.kazup.hr/index.php/kazu-ide-bus-vozni-red). This app turns them into stops, drawn routes, departures by day, notices, and an admin editor that passengers see on the next refresh.
 
-## Što radi
+It is an unofficial page. It is not operated by, or connected to, Karlovačka županija.
 
-- Karta svih 33 linija (A1–A12, B1–B9, B4/5, C1–C3, D1–D4, E1–E4).
-- Klik na stajalište otvara sljedeće polaske za današnji dan.
-- Autobusi na karti kreću se **prema voznom redu**. To nije GPS. Kad vozila dobiju uređaje, isti sloj može primati stvarne koordinate.
-- Obavijesti. Srce na liniji ili stajalištu filtrira zvonce. Bez prijave favorit ostaje u pregledniku, s računom ide na profil.
-- Kupnja karte: polazište, odredište, zona po kilometrima, odabir popusta, pa konačna cijena. Online naplata je rezervacija, bez stvarnog plaćanja.
-- Admin mijenja polaske i objavljuje obavijest. Karta se osvježava svakih 12 sekundi.
+## What it does
 
-Koordinate stajališta su procijenjene prema nazivu naselja (OpenStreetMap) i kilometraži iz PDF-a. Nisu službeni GPS stupova.
+- A map of all 33 lines (A1–A12, B1–B9, B4/5, C1–C3, D1–D4, E1–E4).
+- Trip planning: origin, destination, duration, and transfers.
+- A stop opens the rest of today’s departures.
+- Buses on the map move **according to the timetable**. This is not GPS. The same layer can later take live coordinates.
+- Notices. A heart on a line or stop filters the bell. Without an account the favourite stays in the browser; with an account it is stored on the profile.
+- Ticket quote: origin, destination, zone by kilometres, discount, then a price. Online checkout is a reservation, not a real payment.
+- An administrator edits departures, stop positions, and road geometry, and publishes notices. The map refreshes every 12 seconds.
 
-Cjenik i subvencije preuzeti su sa [stranice cijena](https://www.kazup.hr/index.php/kazu-ide-bus-cijene-karata): jednokratna, dnevna, mjesečna i godišnja karta, zone I–IX. Subvencija vrijedi za mjesečne i godišnje karte. Turist s eVisitor boravkom ima tri dnevne karte.
+Stop coordinates are estimated from place names (OpenStreetMap) and the kilometre marks in the PDFs. They are not official pole positions.
 
-## Pokretanje
+Fares and subsidies follow the [county price page](https://www.kazup.hr/index.php/kazu-ide-bus-cijene-karata): single, daily, monthly, and yearly tickets, zones I–IX. The subsidy applies to monthly and yearly tickets. A tourist with an eVisitor stay gets three daily tickets.
+
+## Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Aplikacija sluša na [http://127.0.0.1:3847](http://127.0.0.1:3847).
+The app listens on [http://127.0.0.1:3847](http://127.0.0.1:3847).
 
-## Demo računi
+## Demo accounts
 
-| Uloga | E-mail | Lozinka |
+| Role | Email | Password |
 | --- | --- | --- |
 | Administrator | admin@kazide.hr | KazuAdmin2026 |
-| Putnik | ana@kazide.hr | Putnik2026 |
+| Passenger | ana@kazide.hr | Putnik2026 |
 
-Ana već prati linije A1 i A3.
+Ana already follows lines A1 and A3.
 
-Podaci žive u `data/network.json` (početni uvoz) i `data/store.json` (izmjene, računi, karte). `store.json` nastaje pri prvom pokretanju i nije u gitu.
+Data lives in `data/network.json` (the initial import) and `data/store.json` (edits, accounts, tickets). `store.json` is created on first launch and is not in git. On Netlify the app directory is read-only, so runtime edits need a writable store outside the deploy image.
 
-## Napomena o izvoru
+## Source note
 
-Polasci su pročitani iz PDF voznih redova objavljenih na kazup.hr (rujan i listopad 2026., linije A7 i A8 iz datoteka od 7. listopada, D3 s oznakom vrijedi od 12. listopada). Županija je najavila izmjene od 12. listopada i za A1, A3, B2, B3, C1, D2 i D3; ako novi PDF nije bio zakačen na stranicu, u aplikaciji je zadnji objavljeni raspored, a obavijest to kaže. Administrator ga može prepisati u adminu.
+Departures were read from the PDF timetables published on kazup.hr (September and October 2026; lines A7 and A8 from the files dated 7 October; D3 marked valid from 12 October). The county announced further changes from 12 October for A1, A3, B2, B3, C1, D2, and D3. Where a newer PDF was not attached on the site, the app keeps the last published schedule and a notice says so. An administrator can replace it in the admin.
